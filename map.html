@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Mappa 3D con Avatar</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/jscastro76/threebox@v.2.2.2/dist/threebox.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/gh/jscastro76/threebox@v.2.2.2/dist/threebox.css" rel="stylesheet">
+  <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
+  <style>
+    body { margin: 0; padding: 0; }
+    #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+    
+    .avatar-marker {
+      background-image: url('https://cdn-icons-png.flaticon.com/512/149/149071.png');
+      background-size: cover;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 2px solid white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    .custom-controls {
+      position: absolute;
+      bottom: 20px;
+      right: 50px;
+      display: flex;
+      flex-direction: row;
+      gap: 10px;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 8px;
+      border-radius: 12px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .custom-controls button {
+      font-size: 18px;
+      padding: 4px 10px;
+      border: none;
+      background: white;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .pitch-slider {
+      writing-mode: bt-lr;
+      -webkit-appearance: slider-vertical;
+      width: 30px;
+      height: 30px;
+    }
+
+    .top-right-controls {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      display: flex;
+      flex-direction: row;
+      gap: 10px;
+      align-items: center;
+      z-index: 2;
+    }
+
+    .direction-indicator {
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 8px 12px;
+      border-radius: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      backdrop-filter: blur(10px);
+    }
+    
+    .home-button {
+      background: white;
+      border: none;
+      padding: 8px;
+      font-size: 20px;
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+      cursor: pointer;
+    }
+
+    .status-indicator {
+      position: absolute;
+      top: 70px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 10px;
+      border-radius: 5px;
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+      z-index: 1000;
+    }
+
+    .avatar-toggle {
+      background: white;
+      border: none;
+      padding: 8px 12px;
+      font-size: 14px;
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+      cursor: pointer;
+      margin-right: 10px;
+    }
+
+    /* NUOVI STILI PER CONTROLLI GPS */
+    .gps-controls {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 1000;
+    }
+
+    .gps-button {
+      background: rgba(255, 255, 255, 0.9);
+      border: none;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      backdrop-filter: blur(10px);
+    }
+
+    .gps-button:hover {
+      background: rgba(255, 255, 255, 1);
+    }
+
+    .gps-button.active {
+      background: #4CAF50;
+      color: white;
+    }
+
+    .debug-info {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 10px;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 11px;
+      max-width: 300px;
+      z-index: 1000;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  
+  <div class="status-indicator" id="statusIndicator">Caricamento...</div>
+  
+  <!-- CONTROLLI GPS AGGIUNTI QUI -->
+  <div class="gps-controls">
+    <button class="gps-button active" id="gpsToggle" onclick="toggleGPSTracking()">📍 GPS ON</button>
+    <button class="gps-button" onclick="stopGPSTracking()">⏸️ Stop GPS</button>
+    <button class="gps-button" onclick="resumeGPSTracking()">▶️ Start GPS</button>
+  </div>
+  
+  <div class="top-right-controls">
+    <button class="avatar-toggle" id="avatarToggle">👤 3D</button>
+    <button class="home-button" id="goHome">🏠</button>
+    <div class="direction-indicator" id="directionIndicator">N 0°</div>
+  </div>
+  
+  <!-- INFO DEBUG AGGIUNTE QUI -->
+  <div class="debug-info" id="debugInfo">
+    Debug GPS: Caricamento...
+  </div>
+  
+  <div class="custom-controls">
+    <button onclick="map.zoomIn()">+</button>
+    <button onclick="map.zoomOut()">−</button>
+    <input type="range" id="pitchSlider" min="0" max="85" value="60" class="pitch-slider">
+  </div>
+
+  <script>
+    mapboxgl.accessToken = 'pk.eyJ1IjoibWVldGdvLWJ1aWxkMDAiLCJhIjoiY21jcTFzdXV2MGQ0MzJscXc0MHc0Y2Q0ZSJ9.hFWnqVLwck_EoyBZGoxdxA';
+
+    // *** 🟢 AGGIUNGI DEBUG GPS QUI - SUBITO ALL'INIZIO ***
+    console.log('=== DEBUG GPS INFO ===');
+    console.log('GPS disponibile:', !!navigator.geolocation);
+    console.log('HTTPS:', location.protocol === 'https:');
+    console.log('User Agent:', navigator.userAgent);
+    console.log('Piattaforma:', navigator.platform);
+
+    // Aggiorna info debug nell'interfaccia
+    function updateDebugInfo() {
+      const debugDiv = document.getElementById('debugInfo');
+      const info = [
+        `GPS: ${!!navigator.geolocation ? '✅' : '❌'}`,
+        `HTTPS: ${location.protocol === 'https:' ? '✅' : '❌'}`,
+        `Tracking: ${window.gpsWatchId ? '🟢 ON' : '🔴 OFF'}`,
+        `Posizione: ${currentLocation[0].toFixed(6)}, ${currentLocation[1].toFixed(6)}`,
+        `Dispositivo: ${/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ? '📱 Mobile' : '💻 Desktop'}`
+      ];
+      debugDiv.innerHTML = info.join('<br>');
+    }
+
+    // Controllo permessi GPS (se supportato)
+    if (navigator.permissions) {
+      navigator.permissions.query({name: 'geolocation'}).then(function(result) {
+        console.log('Permesso geolocalizzazione:', result.state);
+        if (result.state === 'denied') {
+          alert('⚠️ Permesso GPS negato! Abilita la geolocalizzazione nelle impostazioni del browser.');
+        }
+      });
+    }
+
+    const map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/mapbox/light-v11',
+      zoom: 18,
+      pitch: 60,
+      bearing: 0,
+      center: [0, 0],
+      antialias: true
+    });
+
+    let tb;
+    let avatarModel;
+    let currentLocation = [0, 0];
+    let previousLocation = [0, 0];
+    let avatarMarker;
+    let use3DAvatar = false;
+    let isMoving = false;
+    let movementTimeout;
+    let mixer;
+    let currentAnimation = null;
+    let gpsTrackingActive = false; // *** AGGIUNGI QUESTA VARIABILE ***
+
+    const statusIndicator = document.getElementById('statusIndicator');
+    const avatarToggle = document.getElementById('avatarToggle');
+
+    // *** 🟢 AGGIUNGI TUTTE LE FUNZIONI GPS QUI ***
+    
+    function toggleGPSTracking() {
+      const button = document.getElementById('gpsToggle');
+      if (gpsTrackingActive) {
+        stopGPSTracking();
+        button.textContent = '📍 GPS OFF';
+        button.classList.remove('active');
+      } else {
+        resumeGPSTracking();
+        button.textContent = '📍 GPS ON';
+        button.classList.add('active');
+      }
+    }
+
+    function stopGPSTracking() {
+      if (window.gpsWatchId) {
+        navigator.geolocation.clearWatch(window.gpsWatchId);
+        window.gpsWatchId = null;
+        gpsTrackingActive = false;
+        console.log('GPS tracking fermato');
+        statusIndicator.textContent = 'GPS tracking fermo';
+        updateDebugInfo();
+      }
+    }
+
+    function resumeGPSTracking() {
+      if (!window.gpsWatchId) {
+        startGPSTracking();
+      }
+    }
+
+    function startGPSTracking() {
+      if (!navigator.geolocation) {
+        console.error('Geolocalizzazione non supportata');
+        statusIndicator.textContent = 'GPS non supportato';
+        updateDebugInfo();
+        return;
+      }
+
+      console.log('Iniziando tracking GPS...');
+      statusIndicator.textContent = 'Tracking GPS attivo';
+      gpsTrackingActive = true;
+
+      const watchOptions = {
+        enableHighAccuracy: true,
+        maximumAge: 1000,
+        timeout: 5000
+      };
+
+      const watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          const newLng = position.coords.longitude;
+          const newLat = position.coords.latitude;
+          const newLocation = [newLng, newLat];
+          const accuracy = position.coords.accuracy;
+
+          console.log('Nuova posizione GPS:', newLocation, `Accuratezza: ${accuracy}m`);
+          
+          if (accuracy > 100) {
+            console.warn('Posizione GPS troppo imprecisa, ignorata');
+            return;
+          }
+
+          const distance = calculateDistance(currentLocation, newLocation);
+          
+          if (distance > 1) {
+            console.log(`Movimento rilevato: ${distance.toFixed(2)}m`);
+            handleMovement(newLocation);
+            updateDebugInfo();
+            
+            if (distance > 50) {
+              map.easeTo({
+                center: newLocation,
+                duration: 1000
+              });
+            }
+          }
+        },
+        
+        (error) => {
+          console.error('Errore GPS:', error.message);
+          let errorMsg = 'Errore GPS: ';
+          
+          switch(error.code) {
+            case error.PERMISSION_DENIED:
+              errorMsg += 'Permesso negato';
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMsg += 'Posizione non disponibile';
+              break;
+            case error.TIMEOUT:
+              errorMsg += 'Timeout';
+              break;
+            default:
+              errorMsg += 'Errore sconosciuto';
+          }
+          
+          statusIndicator.textContent = errorMsg;
+          updateDebugInfo();
+        },
+        
+        watchOptions
+      );
+
+      window.gpsWatchId = watchId;
+      updateDebugInfo();
+    }
+
+    function calculateDistance(pos1, pos2) {
+      const R = 6371e3;
+      const φ1 = pos1[1] * Math.PI/180;
+      const φ2 = pos2[1] * Math.PI/180;
+      const Δφ = (pos2[1]-pos1[1]) * Math.PI/180;
+      const Δλ = (pos2[0]-pos1[0]) * Math.PI/180;
+
+      const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ/2) * Math.sin(Δλ/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+      return R * c;
+    }
+
+    // Aggiungi controlli navigazione
+    map.addControl(new mapboxgl.NavigationControl({ showCompass: true, showZoom: false }), 'bottom-right');
+
+    // Marker avatar 2D
+    function createAvatarMarker() {
+      const avatarEl = document.createElement('div');
+      avatarEl.className = 'avatar-marker';
+      avatarMarker = new mapboxgl.Marker(avatarEl)
+        .setLngLat(currentLocation)
+        .addTo(map);
+    }
+
+    // *** RESTO DEL TUO CODICE ESISTENTE... ***
+    // [continua con le tue funzioni initializeThreebox, handleMovement, ecc.]
+    // Inizializza Threebox
+    function initializeThreebox() {
+      tb = new Threebox(map, map.getCanvas().getContext('webgl'), {
+        defaultLights: true
+      });
+
+      map.addLayer({
+        id: 'custom-threebox-model',
+        type: 'custom',
+        renderingMode: '3d',
+        onAdd: function() {
+          console.log('Layer Threebox aggiunto');
+          
+          // Il tuo avatar Ready Player Me - parametri debug
+          const avatarOptions = {
+            obj: 'https://models.readyplayer.me/688490fba5d9e1a75b930b7a.glb',
+            type: 'gltf',
+            scale: { x: 20, y: 20, z: 20 }, // Più grande per vederlo meglio
+            units: 'meters',
+            rotation: { x: 90, y: 180, z: 0 }, // Senza rotazione iniziale
+            anchor: 'bottom-left'
+          };
+
+          console.log('Caricando il tuo avatar Ready Player Me...');
+          statusIndicator.textContent = 'Caricando il tuo avatar...';
+
+          tb.loadObj(avatarOptions, (model) => {
+            console.log('Avatar Ready Player Me caricato con successo!', model);
+            console.log('Posizione corrente:', currentLocation);
+            console.log('Animazioni disponibili:', model.animations);
+            
+            avatarModel = model;
+            
+            // Setup animazioni se disponibili
+            if (model.animations && model.animations.length > 0) {
+              mixer = new THREE.AnimationMixer(model);
+              
+              // Trova e prepara le animazioni comuni
+              const animations = {};
+              model.animations.forEach(clip => {
+                console.log('Animazione trovata:', clip.name);
+                animations[clip.name.toLowerCase()] = mixer.clipAction(clip);
+              });
+              
+              // Avvia animazione idle di default
+              const idleNames = ['idle', 'breathing_idle', 'standing_idle', 'default'];
+              for (let name of idleNames) {
+                if (animations[name]) {
+                  currentAnimation = animations[name];
+                  currentAnimation.play();
+                  console.log('Animazione idle attivata:', name);
+                  break;
+                }
+              }
+              
+              // Se non trova idle, usa la prima animazione disponibile
+              if (!currentAnimation && model.animations.length > 0) {
+                currentAnimation = mixer.clipAction(model.animations[0]);
+                currentAnimation.play();
+                console.log('Usando prima animazione disponibile:', model.animations[0].name);
+              }
+            }
+            
+            // Prova con un offset verticale per assicurarsi che sia visibile
+            avatarModel.setCoords([currentLocation[0], currentLocation[1], 2]);
+            tb.add(avatarModel);
+            
+            statusIndicator.textContent = 'Avatar con animazioni pronto!';
+            setTimeout(() => {
+              statusIndicator.style.display = 'none';
+            }, 5000);
+          });
+        },
+        render: function() {
+          tb.update();
+          
+          // Aggiorna animazioni se disponibili
+          if (mixer) {
+            mixer.update(0.016); // ~60fps
+          }
+        }
+      });
+    }
+
+    // Toggle tra avatar 2D e 3D
+    avatarToggle.addEventListener('click', () => {
+      if (!use3DAvatar) {
+        // Passa a 3D
+        statusIndicator.style.display = 'block';
+        statusIndicator.textContent = 'Caricando il tuo avatar 3D...';
+        
+        // Rimuovi marker 2D
+        if (avatarMarker) {
+          avatarMarker.remove();
+          avatarMarker = null;
+        }
+        
+        // Mostra layer 3D se esiste, altrimenti crealo
+        if (map.getLayer('custom-threebox-model')) {
+          // Layer esiste ma è nascosto, mostralo
+          map.setLayoutProperty('custom-threebox-model', 'visibility', 'visible');
+          if (avatarModel) {
+            avatarModel.setCoords(currentLocation);
+          }
+          statusIndicator.textContent = 'Il tuo avatar 3D è attivo!';
+          setTimeout(() => {
+            statusIndicator.style.display = 'none';
+          }, 2000);
+        } else {
+          // Crea il layer 3D per la prima volta
+          initializeThreebox();
+        }
+        
+        use3DAvatar = true;
+        avatarToggle.textContent = '👤 2D';
+        avatarToggle.style.background = '#4CAF50';
+        avatarToggle.style.color = 'white';
+        
+      } else {
+        // Passa a 2D
+        // Non rimuovere il layer, solo nascondilo
+        if (map.getLayer('custom-threebox-model')) {
+          map.setLayoutProperty('custom-threebox-model', 'visibility', 'none');
+        }
+        
+        createAvatarMarker();
+        use3DAvatar = false;
+        avatarToggle.textContent = '👤 3D';
+        avatarToggle.style.background = 'white';
+        avatarToggle.style.color = 'black';
+        statusIndicator.style.display = 'block';
+        statusIndicator.textContent = 'Avatar 2D attivo';
+        setTimeout(() => {
+          statusIndicator.style.display = 'none';
+        }, 2000);
+      }
+    });
+
+    // Funzione per gestire il movimento e le animazioni
+    function handleMovement(newLocation) {
+        console.log('handleMovement chiamata:', newLocation);
+        
+        const distance = calculateDistance(currentLocation, newLocation);
+        
+        // Soglia minima per evitare micro-movimenti
+        if (distance > 0.5) { // 50cm
+            previousLocation = [...currentLocation];
+            currentLocation = newLocation;
+            
+            // Calcola direzione del movimento
+            const deltaX = newLocation[0] - previousLocation[0];
+            const deltaY = newLocation[1] - previousLocation[1];
+            const bearing = Math.atan2(deltaX, deltaY) * (180 / Math.PI);
+            
+            console.log(`Spostamento avatar: ${distance.toFixed(2)}m, direzione: ${bearing.toFixed(1)}°`);
+            
+            // Aggiorna avatar 3D
+            if (use3DAvatar && avatarModel) {
+            console.log('Aggiornando avatar 3D');
+            
+            // Posiziona avatar
+            avatarModel.setCoords([newLocation[0], newLocation[1], 1]);
+            
+            // Ruota avatar verso direzione movimento
+            avatarModel.setRotation({ 
+                x: 0, 
+                y: -bearing + 90, // Aggiusta offset rotazione
+                z: 0 
+            });
+            
+            // Gestisci animazioni movimento
+            if (mixer) {
+                if (!isMoving) {
+                startWalkingAnimation();
+                }
+                
+                // Reset timer inattività
+                clearTimeout(movementTimeout);
+                isMoving = true;
+                
+                movementTimeout = setTimeout(() => {
+                isMoving = false;
+                startIdleAnimation();
+                console.log('Avatar tornato in idle');
+                }, 3000);
+            }
+            
+            } 
+            // Aggiorna avatar 2D
+            else if (avatarMarker) {
+            console.log('Aggiornando avatar 2D');
+            avatarMarker.setLngLat(newLocation);
+            }
+            
+            // Aggiorna indicatori UI
+            updateMovementUI(distance, bearing);
+        }
+    }
+
+    // Funzioni per gestire le animazioni
+    function startWalkingAnimation() {
+      if (!avatarModel || !mixer) return;
+      
+      // Nomi comuni per animazioni di camminata
+      const walkNames = ['walking', 'walk', 'run', 'running', 'locomotion'];
+      const animations = avatarModel.animations || [];
+      
+      for (let clip of animations) {
+        const name = clip.name.toLowerCase();
+        if (walkNames.some(walkName => name.includes(walkName))) {
+          if (currentAnimation) {
+            currentAnimation.fadeOut(0.3);
+          }
+          currentAnimation = mixer.clipAction(clip);
+          currentAnimation.reset().fadeIn(0.3).play();
+          console.log('Animazione camminata attivata:', clip.name);
+          return;
+        }
+      }
+      
+      console.log('Nessuna animazione di camminata trovata');
+    }
+
+    function startIdleAnimation() {
+      if (!avatarModel || !mixer) return;
+      
+      const idleNames = ['idle', 'breathing_idle', 'standing_idle', 'default'];
+      const animations = avatarModel.animations || [];
+      
+      for (let clip of animations) {
+        const name = clip.name.toLowerCase();
+        if (idleNames.some(idleName => name.includes(idleName))) {
+          if (currentAnimation) {
+            currentAnimation.fadeOut(0.3);
+          }
+          currentAnimation = mixer.clipAction(clip);
+          currentAnimation.reset().fadeIn(0.3).play();
+          console.log('Animazione idle attivata:', clip.name);
+          return;
+        }
+      }
+      
+      // Se non trova idle, usa la prima animazione disponibile
+      if (animations.length > 0) {
+        if (currentAnimation) {
+          currentAnimation.fadeOut(0.3);
+        }
+        currentAnimation = mixer.clipAction(animations[0]);
+        currentAnimation.reset().fadeIn(0.3).play();
+        console.log('Usando prima animazione come idle:', animations[0].name);
+      }
+    }
+
+    // Pitch slider
+    document.getElementById('pitchSlider').addEventListener('input', (e) => {
+      const pitch = parseInt(e.target.value);
+      map.setPitch(pitch);
+    });
+
+    // Indicatore direzione
+    const directionIndicator = document.getElementById('directionIndicator');
+
+    function updateDirectionIndicator() {
+      const bearing = ((map.getBearing() % 360) + 360) % 360;
+      const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+      const index = Math.round(bearing / 45) % 8;
+      const mainDirection = directions[index];
+      directionIndicator.textContent = `${mainDirection} ${Math.round(bearing)}°`;
+    }
+
+    map.on('rotate', updateDirectionIndicator);
+    map.on('load', updateDirectionIndicator);
+
+    // Pulsante home
+    document.getElementById('goHome').addEventListener('click', () => {
+      map.flyTo({ 
+        center: currentLocation, 
+        zoom: 18, 
+        pitch: 60,
+        speed: 0.8 
+      });
+    });
+
+
+    // *** IMPORTANTE: AGGIUNGI QUESTO ALLA FINE DEL CARICAMENTO MAPPA ***
+    map.on('load', () => {
+      console.log('Mappa caricata');
+      
+      // Aggiungi layer edifici 3D
+      map.addLayer({
+        id: '3d-buildings',
+        source: 'composite',
+        'source-layer': 'building',
+        filter: ['==', 'extrude', 'true'],
+        type: 'fill-extrusion',
+        minzoom: 15,
+        paint: {
+          'fill-extrusion-color': '#aaa',
+          'fill-extrusion-height': ['get', 'height'],
+          'fill-extrusion-base': ['get', 'min_height'],
+          'fill-extrusion-opacity': 0.6
+        }
+      });
+      
+      // Ottieni posizione iniziale
+      statusIndicator.textContent = 'Ottenendo posizione GPS...';
+      navigator.geolocation.getCurrentPosition((position) => {
+        const lng = position.coords.longitude;
+        const lat = position.coords.latitude;
+        currentLocation = [lng, lat];
+
+        console.log('Posizione iniziale trovata:', currentLocation);
+        
+        map.flyTo({ 
+          center: currentLocation, 
+          zoom: 18, 
+          pitch: 60,
+          duration: 2000
+        });
+
+        createAvatarMarker();
+        previousLocation = [...currentLocation];
+        
+        // *** INIZIA GPS TRACKING AUTOMATICO ***
+        startGPSTracking();
+        updateDebugInfo();
+        
+        statusIndicator.textContent = 'Tracking GPS attivo - Muoviti!';
+        
+      }, (err) => {
+        console.error('Errore geolocalizzazione:', err);
+        statusIndicator.textContent = 'Errore GPS - Posizione default';
+        
+        currentLocation = [9.1900, 45.4642];
+        map.flyTo({ center: currentLocation, zoom: 18, pitch: 60 });
+        
+        createAvatarMarker();
+        previousLocation = [...currentLocation];
+        
+        startGPSTracking();
+        updateDebugInfo();
+      });
+    });
+
+    // *** AGGIORNA DEBUG INFO OGNI 5 SECONDI ***
+    setInterval(updateDebugInfo, 5000);
+  </script>
+</body>
+</html>
