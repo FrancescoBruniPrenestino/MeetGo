@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mappa 3D con Avatar – Fix & Polish</title>
+  <title>Mappa 3D con Avatar – Ottimizzata</title>
 
   <!-- Mapbox GL JS -->
   <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
@@ -45,6 +45,58 @@
       border-radius: 50%;
       border: 2px solid #fff;
       box-shadow: var(--shadow);
+      /* Transizione smooth per visibilità */
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+
+    /* Loading spinner migliorato */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      backdrop-filter: blur(4px);
+    }
+    
+    .loading-overlay.active {
+      display: flex;
+    }
+    
+    .loading-content {
+      text-align: center;
+      color: white;
+    }
+    
+    .spinner {
+      border: 4px solid rgba(255,255,255,0.3);
+      border-top: 4px solid white;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 15px;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .loading-text {
+      font-size: 16px;
+      font-weight: 500;
+    }
+    
+    .loading-progress {
+      margin-top: 10px;
+      font-size: 14px;
+      opacity: 0.8;
     }
 
     /* Media query per schermi piccoli */
@@ -184,6 +236,8 @@
       font-size: var(--font-size-small); 
       z-index: 1000; 
       max-width: 260px;
+      /* 🆕 MODIFICA 3: Animazione fade in/out */
+      transition: opacity 0.3s ease;
     }
 
     .gps-controls {
@@ -238,28 +292,64 @@
     
     /* Classe per nascondere avatar/marker */
     .avatar-hidden {
-      display: none !important;
-      visibility: hidden !important;
+      opacity: 0 !important;
+      transform: scale(0.8) !important;
+      pointer-events: none !important;
     }
+
+    /* Performance indicator */
+    .performance-indicator {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(0,0,0,.85);
+      color: #fff;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-family: monospace;
+      z-index: 1000;
+      display: none;
+    }
+    
+    .performance-indicator.show {
+      display: block;
+    }
+
   </style>
 </head>
 <body>
   <div id="map"></div>
 
+  <!-- Loading overlay migliorato -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-content">
+      <div class="spinner"></div>
+      <div class="loading-text" id="loadingText">Caricamento avatar...</div>
+      <div class="loading-progress" id="loadingProgress">0%</div>
+    </div>
+  </div>
+
   <div class="status-indicator" id="statusIndicator">Caricamento…</div>
 
   <div class="gps-controls">
     <button class="gps-button active" id="gpsToggle">📍 GPS ON</button>
-    <button class="visibility-button" id="visibilityToggle">👁️ Mostra</button>
+    <button class="visibility-button" id="visibilityToggle">Visibilità ON</button>
   </div>
 
   <div class="top-right-controls">
-    <button class="avatar-toggle" id="avatarToggle">👤 3D</button>
+    <button class="avatar-toggle" id="avatarToggle">👤 2D</button>
+    <button class="avatar-toggle" id="buildingsToggle">🏙️ 3D On</button>
     <button class="home-button" id="goHome">🏠</button>
     <div class="direction-indicator" id="directionIndicator">N 0°</div>
   </div>
 
   <div class="debug-info" id="debugInfo">Debug GPS: Caricamento…</div>
+
+  <!-- 🆕 MODIFICA 6: Performance monitor -->
+  <div class="performance-indicator" id="performanceIndicator">
+    FPS: 60 | Mem: 0 MB
+  </div>
 
   <div class="custom-controls">
     <button id="zoomIn">+</button>
@@ -268,9 +358,110 @@
   </div>
 
   <script>
+    const CONFIG = {
+      // Avatar
+      AVATAR_URL: 'https://models.readyplayer.me/688490fba5d9e1a75b930b7a.glb',
+      AVATAR_FALLBACK_URL: 'https://models.readyplayer.me/688490fba5d9e1a75b930b7a.glb',
+      AVATAR_SCALE: 5,
+      AVATAR_HEIGHT: 1.8,
+      
+      // GPS
+      GPS_ACCURACY_THRESHOLD: 100, // metri
+      GPS_MIN_MOVEMENT: 1, // metri
+      GPS_UPDATE_DISTANCE: 50, // metri per aggiornare mappa
+      EMA_ALPHA: 0.25, // smoothing
+      
+      // Performance
+      TARGET_FPS: 60,
+      ANIMATION_UPDATE_RATE: 1/60,
+      IDLE_TIMEOUT: 1600, // ms
+      
+      // UI
+      STATUS_AUTO_HIDE_DELAY: 2000, // ms
+      TRANSITION_DURATION: 1600, // ms
+      
+      // Fallback location (Milano)
+      DEFAULT_HOME: [0, 0]
+    };
+
     mapboxgl.accessToken = 'pk.eyJ1IjoibWVldGdvLWJ1aWxkMDAiLCJhIjoiY21jcTFzdXV2MGQ0MzJscXc0MHc0Y2Q0ZSJ9.hFWnqVLwck_EoyBZGoxdxA';
 
-    // === DEBUG BASE ===
+    class PerformanceMonitor {
+      constructor() {
+        this.frames = [];
+        this.lastTime = performance.now();
+        this.enabled = false;
+      }
+
+      update() {
+        if (!this.enabled) return;
+        
+        const now = performance.now();
+        const delta = now - this.lastTime;
+        this.lastTime = now;
+        
+        this.frames.push(delta);
+        if (this.frames.length > 60) this.frames.shift();
+        
+        const avgDelta = this.frames.reduce((a, b) => a + b, 0) / this.frames.length;
+        const fps = Math.round(1000 / avgDelta);
+        
+        // Memoria (se disponibile)
+        const mem = performance.memory ? 
+          (performance.memory.usedJSHeapSize / 1048576).toFixed(1) : 'N/A';
+        
+        const indicator = document.getElementById('performanceIndicator');
+        indicator.textContent = `FPS: ${fps} | Mem: ${mem} MB`;
+        
+        // Warning se FPS basso
+        if (fps < 30) {
+          console.warn('⚠️ FPS basso:', fps);
+        }
+      }
+
+      toggle() {
+        this.enabled = !this.enabled;
+        document.getElementById('performanceIndicator').classList.toggle('show', this.enabled);
+      }
+    }
+
+    const perfMonitor = new PerformanceMonitor();
+
+    class ResourceManager {
+      constructor() {
+        this.resources = new Set();
+      }
+
+      track(resource, disposeMethod = 'dispose') {
+        this.resources.add({ resource, disposeMethod });
+      }
+
+      cleanup() {
+        console.log('🧹 Pulizia risorse:', this.resources.size);
+        this.resources.forEach(({ resource, disposeMethod }) => {
+          try {
+            if (resource && typeof resource[disposeMethod] === 'function') {
+              resource[disposeMethod]();
+            }
+          } catch (e) {
+            console.warn('Errore cleanup:', e);
+          }
+        });
+        this.resources.clear();
+      }
+    }
+
+    const resourceManager = new ResourceManager();
+
+    // Cleanup automatico prima di chiudere
+    window.addEventListener('beforeunload', () => {
+      resourceManager.cleanup();
+      if (window.__gpsWatchId) {
+        navigator.geolocation.clearWatch(window.__gpsWatchId);
+      }
+    });
+
+    // DEBUG BASE
     console.log('=== DEBUG GPS INFO ===');
     console.log('GPS disponibile:', !!navigator.geolocation);
     console.log('HTTPS:', location.protocol === 'https:');
@@ -280,12 +471,23 @@
     const debugDiv = document.getElementById('debugInfo');
     const avatarToggle = document.getElementById('avatarToggle');
     const visibilityToggle = document.getElementById('visibilityToggle');
-    const DEFAULT_HOME = [0, 0];
+    const buildingsToggle = document.getElementById('buildingsToggle');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const loadingText = document.getElementById('loadingText');
+    const loadingProgress = document.getElementById('loadingProgress');
 
     const map = new mapboxgl.Map({
       container: 'map',
-      style: 'mapbox://styles/mapbox/light-v11',
-      zoom: 18, pitch: 60, bearing: 0, center: [0,0], antialias: true
+      style: 'mapbox://styles/mapbox/streets-v12',
+      zoom: 18, 
+      pitch: 60, 
+      bearing: 0, 
+      center: CONFIG.DEFAULT_HOME, 
+      antialias: true,
+      // 🆕 Performance optimizations
+      maxTileCacheSize: 50, // ridotto da default
+      preserveDrawingBuffer: false,
+      refreshExpiredTiles: false
     });
 
     // Controlli zoom custom
@@ -294,314 +496,666 @@
     document.getElementById('pitchSlider').addEventListener('input', (e) => map.setPitch(parseInt(e.target.value,10)));
 
     // NavigationControl (solo bussola)
-    map.addControl(new mapboxgl.NavigationControl({ showCompass: true, showZoom: false }), 'bottom-right');
+    const navControl = new mapboxgl.NavigationControl({
+                        showCompass: true,
+                        showZoom: false
+                        });
+
+    // Aggiungi il controllo alla mappa
+    map.addControl(navControl, 'bottom-right');
+    /*map.addControl(new mapboxgl.NavigationControl({ showCompass: true, showZoom: false }), 'bottom-right');*/
 
     let tb, avatarModel, mixer, currentAnimation = null;
     let use3DAvatar = false;
-    let avatarVisible = true; // Nuovo stato per visibilità
+    let avatarVisible = true;
 
-    let currentLocation = [0,0];
-    let previousLocation = [0,0];
-    let smoothedLocation = [0,0];
+    let currentLocation = null;
+    let previousLocation = null;
+    let smoothedLocation = null;
     let avatarMarker;
     let gpsTrackingActive = false;
     let movementTimeout;
-
-    const EMA_ALPHA = 0.25;
     
     window.__lastMoveSpeedKmh = 0;
+    
+    // Debounce per evitare troppe chiamate
+    function debounce(func, wait) {
+      let timeout;
+      return function executedFunction(...args) {
+        const later = () => {
+          clearTimeout(timeout);
+          func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+      };
+    }
 
-    function updateDebugInfo(extra) {
+    // Throttle per limitare frequenza
+    function throttle(func, limit) {
+      let inThrottle;
+      return function(...args) {
+        if (!inThrottle) {
+          func.apply(this, args);
+          inThrottle = true;
+          setTimeout(() => inThrottle = false, limit);
+        }
+      };
+    }
+
+    // 🆕 Update debug con throttle (evita troppi aggiornamenti)
+    const updateDebugInfo = throttle((extra) => {
       const info = [
         `GPS: ${!!navigator.geolocation ? '✅' : '❌'}`,
         `HTTPS: ${location.protocol === 'https:' ? '✅' : '❌'}`,
         `Tracking: ${gpsTrackingActive ? '🟢 ON' : '🔴 OFF'}`,
-        `Avatar: ${avatarVisible ? '👁️ Visibile' : '🚫 Nascosto'}`,
-        /*`Posizione: ${smoothedLocation[0].toFixed(6)}, ${smoothedLocation[1].toFixed(6)}`,*/
-        `Posizione: ${smoothedLocation ? smoothedLocation[0].toFixed(6)+", "+smoothedLocation[1].toFixed(6) : "N/A"}`,
+        `Avatar: ${avatarVisible ? 'Visibilità ON' : 'Visibilità OFF'}`,
+        smoothedLocation ? `Pos: ${smoothedLocation[0].toFixed(6)}, ${smoothedLocation[1].toFixed(6)}` : 'Pos: N/A',
         `Device: ${/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ? '📱' : '💻'}`,
         extra ? `Note: ${extra}` : ''
       ].filter(Boolean);
       debugDiv.textContent = info.join('\n');
+    }, 1000);
+
+    function showLoading(show, text = 'Caricamento...', progress = 0) {
+      if (show) {
+        loadingOverlay.classList.add('active');
+        loadingText.textContent = text;
+        loadingProgress.textContent = progress > 0 ? `${Math.round(progress)}%` : '';
+      } else {
+        loadingOverlay.classList.remove('active');
+      }
     }
 
-    // Permessi
-    navigator.permissions.query({ name: 'geolocation' }).then((res) => {
-        console.log('Permesso geolocalizzazione:', res.state);
+    function updateLoadingProgress(progress, text) {
+      loadingProgress.textContent = `${Math.round(progress)}%`;
+      if (text) loadingText.textContent = text;
+    }
 
-        const onOk = (pos) => {
-            const lng = pos.coords.longitude, lat = pos.coords.latitude;
-            currentLocation = [lng,lat];
-            previousLocation = [lng,lat];
-            smoothedLocation = [lng,lat];
-            map.flyTo({ center: currentLocation, zoom: 18, pitch: 60, duration: 1600 });
-            createAvatarMarker();
-            resumeGPSTracking();
-            updateDirectionIndicator();
-            enableCompassHeading();
-            updateDebugInfo();
-        };
+    function setStatus(message, autoHide = true, duration = CONFIG.STATUS_AUTO_HIDE_DELAY) {
+      statusIndicator.style.display = 'block';
+      statusIndicator.style.opacity = '1';
+      statusIndicator.textContent = message;
+      
+      if (autoHide) {
+        setTimeout(() => {
+          statusIndicator.style.opacity = '0';
+          setTimeout(() => {
+            statusIndicator.style.display = 'none';
+          }, 300);
+        }, duration);
+      }
+    }
 
-        const onErr = (err) => {
-            console.warn('Errore geolocalizzazione iniziale:', err);
-            statusIndicator.textContent = 'Errore GPS – uso posizione di fallback (Milano)';
-            currentLocation = [9.1900, 45.4642];
-            previousLocation = [...currentLocation];
-            smoothedLocation = [...currentLocation];
-            map.flyTo({ center: currentLocation, zoom: 18, pitch: 60, duration: 1200 });
-            createAvatarMarker();
-            resumeGPSTracking();
-            updateDirectionIndicator();
-            enableCompassHeading();
-            updateDebugInfo('Fallback: Milano');
-        };
+    async function initializeLocation() {
+      showLoading(true, 'Rilevamento posizione GPS...', 10);
+      
+      // Check permessi
+      try {
+        const permissionResult = await navigator.permissions.query({ name: 'geolocation' });
+        console.log('Permesso geolocalizzazione:', permissionResult.state);
+        updateLoadingProgress(30, 'Verifica permessi...');
+      } catch (e) {
+        console.warn('Permissions API non disponibile:', e);
+      }
 
-        // 👇 sempre tenta di ottenere la posizione
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(onOk, onErr, { enableHighAccuracy: true, timeout: 8000 });
-        } else {
-            onErr(new Error('Geolocalizzazione non supportata'));
+      const onSuccess = (pos) => {
+        const lng = pos.coords.longitude;
+        const lat = pos.coords.latitude;
+        const accuracy = pos.coords.accuracy;
+        
+        console.log('✅ GPS ottenuto:', { lng, lat, accuracy });
+        updateLoadingProgress(60, 'Posizione trovata!');
+        
+        currentLocation = [lng, lat];
+        previousLocation = [lng, lat];
+        smoothedLocation = [lng, lat];
+        
+        updateLoadingProgress(80, 'Centraggio mappa...');
+        map.flyTo({ 
+          center: currentLocation, 
+          zoom: 18, 
+          pitch: 60, 
+          duration: CONFIG.TRANSITION_DURATION 
+        });
+        
+        updateLoadingProgress(90, 'Creazione avatar...');
+        createAvatarMarker();
+        resumeGPSTracking();
+        updateDirectionIndicator();
+        enableCompassHeading();
+        updateDebugInfo();
+        
+        updateLoadingProgress(100, 'Completato!');
+        setTimeout(() => showLoading(false), 500);
+        setStatus('Posizione GPS acquisita!');
+      };
+
+      const onError = (err) => {
+        console.warn('⚠️ Errore geolocalizzazione:', err.message, err.code);
+        
+        let errorMsg = 'Errore GPS';
+        switch(err.code) {
+          case 1: errorMsg = 'Permesso GPS negato'; break;
+          case 2: errorMsg = 'Posizione non disponibile'; break;
+          case 3: errorMsg = 'Timeout GPS'; break;
         }
-    });
+        
+        updateLoadingProgress(50, `${errorMsg} - uso Milano`);
+        
+        currentLocation = CONFIG.DEFAULT_HOME;
+        previousLocation = [...CONFIG.DEFAULT_HOME];
+        smoothedLocation = [...CONFIG.DEFAULT_HOME];
+        
+        map.flyTo({ 
+          center: currentLocation, 
+          zoom: 18, 
+          pitch: 60, 
+          duration: 1200 
+        });
+        
+        createAvatarMarker();
+        resumeGPSTracking();
+        updateDirectionIndicator();
+        enableCompassHeading();
+        updateDebugInfo(`Fallback: ${errorMsg}`);
+        
+        setTimeout(() => showLoading(false), 1000);
+        setStatus(`${errorMsg} - Usando posizione di default`, true, 4000);
+      };
 
-    // Marker 2D
+      // Tentativo di ottenere posizione
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          onSuccess, 
+          onError, 
+          { 
+            enableHighAccuracy: true, 
+            timeout: 8000,
+            maximumAge: 5000 // accetta cache fino a 5s
+          }
+        );
+      } else {
+        onError(new Error('Geolocalizzazione non supportata'));
+      }
+    }
+
+    // Avvia inizializzazione
+    initializeLocation();
+
     function createAvatarMarker() {
+      // Rimuovi marker esistente
+      if (avatarMarker) {
+        avatarMarker.remove();
+        avatarMarker = null;
+      }
+
       const el = document.createElement('div');
       el.className = 'avatar-marker';
       if (!avatarVisible) el.classList.add('avatar-hidden');
-      avatarMarker = new mapboxgl.Marker(el).setLngLat(smoothedLocation).addTo(map);
+      
+      avatarMarker = new mapboxgl.Marker(el)
+        .setLngLat(smoothedLocation || CONFIG.DEFAULT_HOME)
+        .addTo(map);
+      
+      console.log('✅ Marker 2D creato');
     }
 
-    // Threebox layer
     function initializeThreebox() {
-      tb = new Threebox(map, map.getCanvas().getContext('webgl'), { defaultLights: true });
+      try {
+        tb = new Threebox(map, map.getCanvas().getContext('webgl'), { 
+          defaultLights: true,
+          realSunlight: true // 🆕 luce solare realistica
+        });
 
-      map.addLayer({
-        id: 'custom-threebox-model',
-        type: 'custom',
-        renderingMode: '3d',
-        onAdd: function() {
-          statusIndicator.textContent = 'Caricamento avatar…';
-
-          const avatarOptions = {
-            obj: 'https://models.readyplayer.me/688490fba5d9e1a75b930b7a.glb',
-            type: 'gltf',
-            scale: { x: 20, y: 20, z: 20 },
-            units: 'meters',
-            rotation: { x: 90, y: 180, z: 0 },
-            anchor: 'bottom-left'
-          };
-
-          tb.loadObj(avatarOptions, (model) => {
-            avatarModel = model;
-
-            if (model.animations && model.animations.length) {
-              mixer = new THREE.AnimationMixer(model);
-              const idleNames = ['idle','breathing_idle','standing_idle','default'];
-              const byName = {};
-              model.animations.forEach(clip => byName[clip.name.toLowerCase()] = clip);
-              for (const n of idleNames) {
-                if (byName[n]) { 
-                  currentAnimation = mixer.clipAction(byName[n]); 
-                  currentAnimation.play(); 
-                  break; 
-                }
-              }
-              if (!currentAnimation) { 
-                currentAnimation = mixer.clipAction(model.animations[0]); 
-                currentAnimation.play(); 
-              }
-            }
-
-            avatarModel.setCoords([smoothedLocation[0], smoothedLocation[1], 2]);
-            if (!avatarVisible) avatarModel.visible = false;
-            tb.add(avatarModel);
-
-            statusIndicator.textContent = 'Avatar pronto!';
-            setTimeout(() => statusIndicator.style.display = 'none', 2000);
-          });
+        map.addLayer({
+          id: 'custom-threebox-model',
+          type: 'custom',
+          renderingMode: '3d',
+          onAdd: function() {
+            loadAvatar3D();
+          },
+          render: function(gl, matrix) {
+            // 🆕 Update performance monitor
+            perfMonitor.update();
+            
+            tb.update();
+            if (mixer) mixer.update(CONFIG.ANIMATION_UPDATE_RATE);
+          }
+        });
+      } catch (error) {
+        console.error('❌ Errore inizializzazione Threebox:', error);
+        setStatus('Errore caricamento 3D - uso marker 2D', true, 4000);
+        use3DAvatar = false;
+        createAvatarMarker();
+      }
+    }
+    
+    async function loadAvatar3D(isRetry = false) {
+      const avatarUrl = isRetry ? CONFIG.AVATAR_FALLBACK_URL : CONFIG.AVATAR_URL;
+      
+      showLoading(true, isRetry ? 'Caricamento avatar fallback...' : 'Caricamento avatar 3D...', 0);
+      
+      const avatarOptions = {
+        obj: avatarUrl,
+        type: 'gltf',
+        scale: { 
+          x: CONFIG.AVATAR_SCALE, 
+          y: CONFIG.AVATAR_SCALE, 
+          z: CONFIG.AVATAR_SCALE 
         },
-        render: function(gl, matrix) {
-          tb.update();
-          if (mixer) mixer.update(1/60);
+        units: 'meters',
+        rotation: { x: 90, y: 180, z: 0 },
+        anchor: 'bottom-left'
+      };
+
+      tb.loadObj(avatarOptions, (model) => {
+        console.log('✅ Avatar 3D caricato:', avatarUrl);
+        avatarModel = model;
+        
+        updateLoadingProgress(50, 'Setup animazioni...');
+
+        // 🆕 MODIFICA 18: GESTIONE ANIMAZIONI MIGLIORATA
+        if (model.animations && model.animations.length) {
+          console.log(`📽️ ${model.animations.length} animazioni trovate`);
+          
+          mixer = new THREE.AnimationMixer(model);
+          
+          // Track per cleanup
+          resourceManager.track(mixer, 'stopAllAction');
+          
+          // Trova e avvia animazione idle
+          const idleNames = ['idle', 'breathing_idle', 'standing_idle', 'default'];
+          const animationMap = {};
+          
+          model.animations.forEach(clip => {
+            const name = clip.name.toLowerCase();
+            animationMap[name] = clip;
+            console.log(`  - ${clip.name}: ${clip.duration.toFixed(2)}s`);
+          });
+          
+          // Cerca idle animation
+          for (const name of idleNames) {
+            if (animationMap[name]) {
+              currentAnimation = mixer.clipAction(animationMap[name]);
+              currentAnimation.play();
+              console.log('▶️ Animazione idle avviata:', name);
+              break;
+            }
+          }
+          
+          // Fallback: usa prima animazione disponibile
+          if (!currentAnimation && model.animations.length > 0) {
+            currentAnimation = mixer.clipAction(model.animations[0]);
+            currentAnimation.play();
+            console.log('▶️ Animazione fallback avviata:', model.animations[0].name);
+          }
+        } else {
+          console.warn('⚠️ Nessuna animazione trovata nel modello');
+        }
+
+        updateLoadingProgress(75, 'Posizionamento avatar...');
+        
+        // 🆕 MODIFICA 19: POSIZIONAMENTO CON VALIDAZIONE
+        const coords = smoothedLocation || CONFIG.DEFAULT_HOME;
+        avatarModel.setCoords([coords[0], coords[1], CONFIG.AVATAR_HEIGHT]);
+        
+        if (!avatarVisible) {
+          avatarModel.visible = false;
+        }
+        
+        tb.add(avatarModel);
+        
+        // 🆕 Track per cleanup
+        resourceManager.track(avatarModel);
+
+        updateLoadingProgress(100, 'Avatar pronto!');
+        showLoading(false);
+        setStatus('Avatar 3D caricato con successo!');
+        
+        // 🆕 Log info modello
+        logModelInfo(model);
+        
+      }, (progress) => {
+        // 🆕 MODIFICA 20: PROGRESS CALLBACK
+        const percent = (progress.loaded / progress.total) * 100;
+        updateLoadingProgress(percent, 'Download avatar...');
+        console.log(`📥 Download: ${percent.toFixed(0)}%`);
+      }, (error) => {
+        // 🆕 MODIFICA 21: GESTIONE ERRORI CON RETRY
+        console.error('❌ Errore caricamento avatar:', error);
+        
+        if (!isRetry) {
+          console.log('🔄 Tentativo con avatar fallback...');
+          setTimeout(() => loadAvatar3D(true), 1000);
+        } else {
+          showLoading(false);
+          setStatus('Errore caricamento avatar - uso marker 2D', true, 4000);
+          use3DAvatar = false;
+          createAvatarMarker();
+          
+          avatarToggle.textContent = '👤 2D';
+          avatarToggle.style.background = 'white';
+          avatarToggle.style.color = 'black';
         }
       });
     }
 
-    // Toggle Visibilità Avatar
+    function logModelInfo(model) {
+      console.group('📊 Dettagli Modello 3D');
+      
+      if (model.scene) {
+        let vertCount = 0, faceCount = 0, meshCount = 0;
+        let textureCount = 0, textureMemory = 0;
+        
+        model.scene.traverse((child) => {
+          if (child.isMesh) {
+            meshCount++;
+            
+            if (child.geometry) {
+              if (child.geometry.attributes.position) {
+                vertCount += child.geometry.attributes.position.count;
+              }
+              if (child.geometry.index) {
+                faceCount += child.geometry.index.count / 3;
+              }
+            }
+            
+            if (child.material) {
+              const mat = Array.isArray(child.material) ? child.material : [child.material];
+              mat.forEach(m => {
+                if (m.map && m.map.image) {
+                  textureCount++;
+                  const img = m.map.image;
+                  const bytes = (img.width || 512) * (img.height || 512) * 4;
+                  textureMemory += bytes;
+                }
+              });
+            }
+          }
+        });
+        
+        console.log(`Meshes: ${meshCount}`);
+        console.log(`Vertici: ${vertCount.toLocaleString()}`);
+        console.log(`Facce: ${Math.round(faceCount).toLocaleString()}`);
+        console.log(`Texture: ${textureCount} (~${(textureMemory/1048576).toFixed(2)} MB)`);
+      }
+      
+      if (model.animations) {
+        console.log(`\nAnimazioni: ${model.animations.length}`);
+        model.animations.forEach((anim, i) => {
+          console.log(`  ${i + 1}. ${anim.name || 'Unnamed'} - ${anim.duration.toFixed(2)}s (${anim.tracks.length} tracks)`);
+        });
+      }
+      
+      console.groupEnd();
+    }
+
     visibilityToggle.addEventListener('click', () => {
       avatarVisible = !avatarVisible;
       
       if (avatarVisible) {
-        visibilityToggle.textContent = '👁️ Mostra';
+        visibilityToggle.textContent = 'Visibilità ON';
         visibilityToggle.classList.remove('hidden');
         
         if (use3DAvatar && avatarModel) {
-          avatarModel.visible = true;
+            avatarModel.setObjectScale(CONFIG.AVATAR_SCALE, CONFIG.AVATAR_SCALE, CONFIG.AVATAR_SCALE);
+          
+            // Prova anche traverse di THREE.js
+            if (avatarModel.scene) {
+                avatarModel.scene.traverse((child) => {
+                if (child.isMesh) {
+                    child.visible = true;
+                }
+                });
+            }
+
+          /* avatarModel.visible = true;*/
         } else if (avatarMarker) {
           avatarMarker.getElement().classList.remove('avatar-hidden');
         }
         
-        statusIndicator.style.display = 'block';
-        statusIndicator.textContent = 'Avatar visibile';
+        setStatus('Avatar visibile');
       } else {
-        visibilityToggle.textContent = '🚫 Nascondi';
+        visibilityToggle.textContent = 'Visibilità OFF';
         visibilityToggle.classList.add('hidden');
         
         if (use3DAvatar && avatarModel) {
-          avatarModel.visible = false;
+            avatarModel.setObjectScale(0.001, 0.001, 0.001);
+            if (avatarModel.scene) {
+                avatarModel.scene.traverse((child) => {
+                if (child.isMesh) {
+                    child.visible = false;
+                }
+                });
+            }
+        /*    if (avatarModel.scene) {                
+                avatarModel.scene.visible = false;
+                }
+                avatarModel.visible = false;
+        */
         } else if (avatarMarker) {
           avatarMarker.getElement().classList.add('avatar-hidden');
         }
         
-        statusIndicator.style.display = 'block';
-        statusIndicator.textContent = 'Avatar nascosto';
+        setStatus('Avatar nascosto');
       }
       
-      /*setTimeout(() => statusIndicator.style.display = 'none', 1500);*/
       updateDebugInfo();
     });
 
-    // Toggle 2D/3D
     avatarToggle.addEventListener('click', () => {
       if (!use3DAvatar) {
-        statusIndicator.style.display = 'block';
-        statusIndicator.textContent = 'Attivo avatar 3D…';
-        if (avatarMarker) { avatarMarker.remove(); avatarMarker = null; }
+        // Passa a 3D
+        setStatus('Attivazione avatar 3D...', false);
+        
+        // Rimuovi marker 2D
+        if (avatarMarker) {
+          avatarMarker.remove();
+          avatarMarker = null;
+        }
+        
+        // Attiva layer 3D
         if (map.getLayer('custom-threebox-model')) {
-          map.setLayoutProperty('custom-threebox-model','visibility','visible');
+          map.setLayoutProperty('custom-threebox-model', 'visibility', 'visible');
+          
           if (avatarModel) {
-            avatarModel.setCoords([smoothedLocation[0], smoothedLocation[1], 2]);
-            if (avatarVisible) avatarModel.visible = true;
+            const coords = smoothedLocation || CONFIG.DEFAULT_HOME;
+            avatarModel.setCoords([coords[0], coords[1], CONFIG.AVATAR_HEIGHT]);
+            avatarModel.visible = avatarVisible;
           }
-          statusIndicator.textContent = 'Avatar 3D attivo!';
-          setTimeout(() => statusIndicator.style.display = 'none', 1500);
+          setStatus('Avatar 3D attivo!');
         } else {
           initializeThreebox();
         }
+        
         use3DAvatar = true;
-        avatarToggle.textContent = '👤 2D';
+        avatarToggle.textContent = '👤 3D';
         avatarToggle.style.background = '#4CAF50';
         avatarToggle.style.color = '#fff';
+        
       } else {
+        // Passa a 2D
         if (map.getLayer('custom-threebox-model')) {
-          map.setLayoutProperty('custom-threebox-model','visibility','none');
+          map.setLayoutProperty('custom-threebox-model', 'visibility', 'none');
         }
+        
         createAvatarMarker();
         use3DAvatar = false;
-        avatarToggle.textContent = '👤 3D';
+        
+        avatarToggle.textContent = '👤 2D';
         avatarToggle.style.background = 'white';
         avatarToggle.style.color = 'black';
-        statusIndicator.style.display = 'block';
-        statusIndicator.textContent = 'Avatar 2D attivo';
-        setTimeout(() => statusIndicator.style.display = 'none', 1500);
+        
+        setStatus('Avatar 2D attivo');
       }
     });
 
-    // Bearing geografico
-    function geographicBearing(from, to){
-      const [lon1, lat1] = from.map(v => v * Math.PI/180);
-      const [lon2, lat2] = to.map(v => v * Math.PI/180);
+    let buildingsVisible = true;
+    buildingsToggle.addEventListener('click', () => {
+      buildingsVisible = !buildingsVisible;
+      
+      if (map.getLayer('3d-buildings')) {
+        map.setLayoutProperty('3d-buildings', 'visibility', buildingsVisible ? 'visible' : 'none');
+        buildingsToggle.textContent = buildingsVisible ? '🏙️ 3D On' : '🏙️ 3D Off';
+        setStatus(buildingsVisible ? 'Edifici 3D visibili' : 'Edifici 3D nascosti');
+      }
+    });
+
+    function geographicBearing(from, to) {
+      const [lon1, lat1] = from.map(v => v * Math.PI / 180);
+      const [lon2, lat2] = to.map(v => v * Math.PI / 180);
       const dLon = lon2 - lon1;
       const y = Math.sin(dLon) * Math.cos(lat2);
-      const x = Math.cos(lat1)*Math.sin(lat2) - Math.sin(lat1)*Math.cos(lat2)*Math.cos(dLon);
-      let brng = Math.atan2(y, x) * 180/Math.PI;
+      const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+      let brng = Math.atan2(y, x) * 180 / Math.PI;
       return (brng + 360) % 360;
     }
 
-    function calculateDistance(a,b){
-      const R=6371e3;
-      const [lon1,lat1]=a.map(v=>v*Math.PI/180);
-      const [lon2,lat2]=b.map(v=>v*Math.PI/180);
-      const dLat=lat2-lat1, dLon=lon2-lon1;
-      const h = Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLon/2)**2;
-      return 2*R*Math.asin(Math.sqrt(h));
+    function calculateDistance(a, b) {
+      if (!a || !b) return 0;
+      
+      const R = 6371e3; // Earth radius in meters
+      const [lon1, lat1] = a.map(v => v * Math.PI / 180);
+      const [lon2, lat2] = b.map(v => v * Math.PI / 180);
+      const dLat = lat2 - lat1;
+      const dLon = lon2 - lon1;
+      const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+      return 2 * R * Math.asin(Math.sqrt(h));
     }
 
-    function lerp(a,b,t){ return a + (b-a)*t; }
+    function lerp(a, b, t) { 
+      return a + (b - a) * t; 
+    }
 
-    function smoothTo(target){
+    // 🆕 MODIFICA 27: SMOOTHING CON VALIDAZIONE
+    function smoothTo(target) {
+      if (!target || target.length !== 2) {
+        console.warn('⚠️ Target invalido per smoothing');
+        return;
+      }
+      
+      if (!smoothedLocation) {
+        smoothedLocation = [...target];
+        return;
+      }
+      
       smoothedLocation = [
-        lerp(smoothedLocation[0], target[0], EMA_ALPHA),
-        lerp(smoothedLocation[1], target[1], EMA_ALPHA)
+        lerp(smoothedLocation[0], target[0], CONFIG.EMA_ALPHA),
+        lerp(smoothedLocation[1], target[1], CONFIG.EMA_ALPHA)
       ];
     }
 
-    function updateMovementUI(distance, bearing){
-        const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
-        const idx = Math.round(bearing/22.5)%16;
-        const direction = dirs[idx];
+    const updateMovementUI = throttle((distance, bearing) => {
+      const dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+      const idx = Math.round(bearing / 22.5) % 16;
+      const direction = dirs[idx];
 
-        const now = performance.now();
-        if (!window.__lastMoveTime) { window.__lastMoveTime = now; window.__lastMoveDist = 0; }
-        const dt = Math.max(1, (now - window.__lastMoveTime)/1000);
-        const speed = distance/dt;
-        const kmh = speed*3.6;
-
-        window.__lastMoveSpeedKmh = kmh;
-
-        const dirEl = document.getElementById('directionIndicator');
-        // Versione abbreviata per mobile
-        const isMobile = window.innerWidth <= 768;
-        if (isMobile) {
-          dirEl.textContent = `${direction} ${Math.round(bearing)}°`;
-        } else {
-          dirEl.textContent = `${direction} ${Math.round(bearing)}° • ${kmh.toFixed(1)} km/h`;
-        }
+      const now = performance.now();
+      if (!window.__lastMoveTime) {
         window.__lastMoveTime = now;
-    }
+        window.__lastMoveDist = 0;
+      }
+      
+      const dt = Math.max(0.1, (now - window.__lastMoveTime) / 1000);
+      const speed = distance / dt;
+      const kmh = speed * 3.6;
 
-    function startWalkingAnimation(){
+      window.__lastMoveSpeedKmh = kmh;
+
+      const dirEl = document.getElementById('directionIndicator');
+      const isMobile = window.innerWidth <= 768;
+      
+      if (isMobile) {
+        dirEl.textContent = `${direction} ${Math.round(bearing)}°`;
+        map.removeControl(navControl);
+      } else {
+        dirEl.textContent = `${direction} ${Math.round(bearing)}° • ${kmh.toFixed(1)} km/h`;
+        map.addControl(navControl, 'bottom-right');
+      }
+      
+      window.__lastMoveTime = now;
+    }, 500); // Update ogni 500ms max
+
+    function startWalkingAnimation() {
       if (!avatarModel || !mixer) return;
-      const names = ['walking','walk','run','running','locomotion'];
-      for (const clip of (avatarModel.animations||[])){
+      
+      const walkNames = ['walking', 'walk', 'run', 'running', 'locomotion'];
+      
+      for (const clip of (avatarModel.animations || [])) {
         const n = clip.name.toLowerCase();
-        if (names.some(s => n.includes(s))){
-          if (currentAnimation) currentAnimation.fadeOut(0.25);
+        if (walkNames.some(s => n.includes(s))) {
+          if (currentAnimation) {
+            currentAnimation.fadeOut(0.25);
+          }
           currentAnimation = mixer.clipAction(clip);
           currentAnimation.reset().fadeIn(0.25).play();
+          console.log('🚶 Walking animation:', clip.name);
           return;
         }
       }
     }
 
-    function startIdleAnimation(){
+    function startIdleAnimation() {
       if (!avatarModel || !mixer) return;
-      const names = ['idle','breathing_idle','standing_idle','default'];
-      for (const clip of (avatarModel.animations||[])){
+      
+      const idleNames = ['idle', 'breathing_idle', 'standing_idle', 'default'];
+      
+      for (const clip of (avatarModel.animations || [])) {
         const n = clip.name.toLowerCase();
-        if (names.some(s => n.includes(s))){
-          if (currentAnimation) currentAnimation.fadeOut(0.25);
+        if (idleNames.some(s => n.includes(s))) {
+          if (currentAnimation) {
+            currentAnimation.fadeOut(0.25);
+          }
           currentAnimation = mixer.clipAction(clip);
           currentAnimation.reset().fadeIn(0.25).play();
+          console.log('🧍 Idle animation:', clip.name);
           return;
         }
       }
-      if ((avatarModel.animations||[]).length){
-        if (currentAnimation) currentAnimation.fadeOut(0.25);
+      
+      // Fallback alla prima animazione
+      if ((avatarModel.animations || []).length) {
+        if (currentAnimation) {
+          currentAnimation.fadeOut(0.25);
+        }
         currentAnimation = mixer.clipAction(avatarModel.animations[0]);
         currentAnimation.reset().fadeIn(0.25).play();
       }
     }
 
-    function applyAvatarTransform(newLoc){
+    function applyAvatarTransform(newLoc) {
+      if (!newLoc || newLoc.length !== 2) {
+        console.warn('⚠️ Posizione invalida per transform');
+        return;
+      }
+      
       smoothTo(newLoc);
+      
       const distance = calculateDistance(currentLocation, newLoc);
-      const bearing = geographicBearing(previousLocation, newLoc);
+      const bearing = geographicBearing(previousLocation || currentLocation, newLoc);
 
-      if (use3DAvatar && avatarModel){
-        avatarModel.setCoords([smoothedLocation[0], smoothedLocation[1], 1.8]);
+      if (use3DAvatar && avatarModel) {
+        // Posizionamento
+        avatarModel.setCoords([
+          smoothedLocation[0], 
+          smoothedLocation[1], 
+          CONFIG.AVATAR_HEIGHT
+        ]);
         
-        // FIX 1: Rotazione solo sull'asse Y (yaw), mantieni X fisso a 90
+        // ROTAZIONE CORRETTA (solo Y axis)
         const yDeg = -(bearing - 90);
-        avatarModel.setRotation({ x: 0, y: yDeg, z: 0 }); // X sempre a 90!
+        avatarModel.setRotation({ x: 90, y: yDeg, z: 0 });
 
-        if (mixer && distance > 1.5){
+        // Animazione basata su movimento
+        if (mixer && distance > CONFIG.GPS_MIN_MOVEMENT) {
           clearTimeout(movementTimeout);
           startWalkingAnimation();
-          movementTimeout = setTimeout(() => startIdleAnimation(), 1600);
+          movementTimeout = setTimeout(() => {
+            startIdleAnimation();
+          }, CONFIG.IDLE_TIMEOUT);
         }
-      } else if (avatarMarker){
+      } else if (avatarMarker) {
         avatarMarker.setLngLat(smoothedLocation);
       }
 
@@ -610,172 +1164,402 @@
       currentLocation = newLoc;
     }
 
-    // Bussola dispositivo (quando fermo)
-    function enableCompassHeading(){
-      function onHeading(heading){
-        if (use3DAvatar && avatarModel && typeof heading === 'number'){
-          // FIX: Mantieni X a 90
-          const yDeg = -(heading - 90);
-          avatarModel.setRotation({ x: 90, y: yDeg, z: 0 }); // X sempre a 90!
+    function enableCompassHeading() {
+      let lastHeading = null;
+      const HEADING_THRESHOLD = 5; // gradi minimo cambiamento
+      
+      function onHeading(heading) {
+        if (use3DAvatar && avatarModel && typeof heading === 'number') {
+          // Applica solo se cambiamento significativo
+          if (lastHeading === null || Math.abs(heading - lastHeading) > HEADING_THRESHOLD) {
+            const yDeg = -(heading - 90);
+            avatarModel.setRotation({ x: 90, y: yDeg, z: 0 });
+            lastHeading = heading;
+          }
         }
       }
 
-      if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function'){
+      // iOS - richiede permesso
+      if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
         avatarToggle.addEventListener('click', async () => {
           try {
             const res = await DeviceOrientationEvent.requestPermission();
             if (res === 'granted') {
-              window.addEventListener('deviceorientation', (e) => onHeading(e.webkitCompassHeading ?? (360 - e.alpha)));
+              window.addEventListener('deviceorientation', (e) => {
+                const h = e.webkitCompassHeading ?? (360 - (e.alpha || 0));
+                onHeading(h);
+              });
+              console.log('✅ Bussola iOS attivata');
             }
-          } catch(err){ console.warn('DeviceOrientation permesso negato', err); }
+          } catch (err) {
+            console.warn('⚠️ Permesso bussola negato:', err);
+          }
         }, { once: true });
-      } else if (window.DeviceOrientationEvent){
-        window.addEventListener('deviceorientationabsolute' in window ? 'deviceorientationabsolute' : 'deviceorientation', (e) => {
-          const h = e.absolute && typeof e.alpha === 'number' ? (360 - e.alpha) : undefined;
-          if (h !== undefined) onHeading(h);
+      } 
+      // Android / altri dispositivi
+      else if (window.DeviceOrientationEvent) {
+        const eventType = 'deviceorientationabsolute' in window ? 
+          'deviceorientationabsolute' : 'deviceorientation';
+        
+        window.addEventListener(eventType, (e) => {
+          if (e.absolute && typeof e.alpha === 'number') {
+            const h = 360 - e.alpha;
+            onHeading(h);
+          }
         });
+        console.log('✅ Bussola Android attivata');
       }
     }
 
-    // GPS
+    function handleGPS(pos) {
+      const { longitude: lng, latitude: lat, accuracy, speed, heading } = pos.coords;
+      const newLoc = [lng, lat];
+      
+      // 🆕 Filtra fix imprecisi
+      if (accuracy && accuracy > CONFIG.GPS_ACCURACY_THRESHOLD) {
+        console.warn(`⚠️ GPS accuracy troppo bassa: ${accuracy.toFixed(0)}m`);
+        updateDebugInfo(`Acc. bassa: ${accuracy.toFixed(0)}m`);
+        return;
+      }
+
+      // GPS heading quando in movimento
+      if (typeof heading === 'number' && !Number.isNaN(heading) && speed && speed > 0.5) {
+        if (use3DAvatar && avatarModel) {
+          const yDeg = -(heading - 90);
+          avatarModel.setRotation({ x: 90, y: yDeg, z: 0 });
+        }
+      }
+
+      // Calcola distanza
+      const d = calculateDistance(smoothedLocation || currentLocation, newLoc);
+      
+      // Applica transform solo se movimento significativo
+      if (d > CONFIG.GPS_MIN_MOVEMENT) {
+        applyAvatarTransform(newLoc);
+        
+        // Aggiorna mappa se movimento grande
+        if (d > CONFIG.GPS_UPDATE_DISTANCE) {
+          map.easeTo({ center: newLoc, duration: 1000 });
+        }
+      }
+      
+      // Update debug
+      const speedKmh = speed ? (speed * 3.6).toFixed(1) : '0.0';
+      updateDebugInfo(`Vel: ${speedKmh} km/h | Acc: ${accuracy?.toFixed(0) || 'N/A'}m`);
+    }
+
     const gpsToggleBtn = document.getElementById('gpsToggle');
     gpsToggleBtn.addEventListener('click', () => {
-      if (gpsTrackingActive) stopGPSTracking(); else resumeGPSTracking();
+      if (gpsTrackingActive) {
+        stopGPSTracking();
+      } else {
+        resumeGPSTracking();
+      }
     });
 
-    function stopGPSTracking(){
-      if (window.__gpsWatchId){
+    function stopGPSTracking() {
+      if (window.__gpsWatchId) {
         navigator.geolocation.clearWatch(window.__gpsWatchId);
         window.__gpsWatchId = null;
       }
-      gpsTrackingActive = false;  
-      // reset variabili posizione
-      currentLocation = null;
-      previousLocation = null;
-      smoothedLocation = null;
       
-      statusIndicator.textContent = 'GPS tracking fermo';
+      gpsTrackingActive = false;
+      
+      setStatus('GPS tracking disattivato');
       gpsToggleBtn.classList.remove('active');
       gpsToggleBtn.textContent = '📍 GPS OFF';
-      updateDebugInfo();
+      updateDebugInfo('GPS OFF');
     }
 
-
-/*     function resumeGPSTracking(){
-      if (!window.__gpsWatchId) startGPSTracking();
-    } */
-
-    function resumeGPSTracking(){
-        if (navigator.geolocation){
-            gpsTrackingActive = true;
-            gpsToggleBtn.classList.add('active');
-            gpsToggleBtn.textContent = '📍 GPS ON';
-            statusIndicator.textContent = 'GPS tracking attivo';
-            
-            // 🔥 prendo subito la posizione iniziale
-            navigator.geolocation.getCurrentPosition((pos) => {
-            const lng = pos.coords.longitude;
-            const lat = pos.coords.latitude;
-            currentLocation = [lng, lat];
-            previousLocation = [lng, lat];
-            smoothedLocation = [lng, lat];
-
-            map.flyTo({ center: currentLocation, zoom: 18, pitch: 60, duration: 1600 });
-
-            if (!avatarMarker && !avatarModel) {
-                createAvatarMarker();
-            }
-
-            updateDirectionIndicator();
-            enableCompassHeading();
-            updateDebugInfo();
-            });
-
-            // poi attivo il tracking continuo
-            window.__gpsWatchId = navigator.geolocation.watchPosition(
-            handleGPS, 
-            (err) => console.error('Errore GPS:', err),
-            { enableHighAccuracy: true, maximumAge: 1000, timeout: 8000 }
-            );
-        }
-    }
-
-    function startGPSTracking(){
-      if (!navigator.geolocation){
-        statusIndicator.textContent = 'GPS non supportato dal browser';
-        updateDebugInfo(); return;
+    function resumeGPSTracking() {
+      if (!navigator.geolocation) {
+        setStatus('GPS non supportato', true, 3000);
+        return;
       }
-      statusIndicator.textContent = 'Tracking GPS attivo';
+
       gpsTrackingActive = true;
       gpsToggleBtn.classList.add('active');
       gpsToggleBtn.textContent = '📍 GPS ON';
+      setStatus('GPS tracking attivo');
 
-      const opts = { enableHighAccuracy: true, maximumAge: 1000, timeout: 8000 };
-      window.__gpsWatchId = navigator.geolocation.watchPosition((pos) => {
-        const { longitude: lng, latitude: lat, accuracy, speed, heading } = pos.coords;
-        const newLoc = [lng, lat];
-        if (accuracy && accuracy > 100) { updateDebugInfo('Ignoro fix >100m'); return; }
+      // 🆕 Prima ottieni posizione corrente
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lng = pos.coords.longitude;
+          const lat = pos.coords.latitude;
+          
+          if (!currentLocation) {
+            currentLocation = [lng, lat];
+            previousLocation = [lng, lat];
+            smoothedLocation = [lng, lat];
+            
+            map.flyTo({ 
+              center: currentLocation, 
+              zoom: 18, 
+              pitch: 60, 
+              duration: CONFIG.TRANSITION_DURATION 
+            });
+            
+            if (!avatarMarker && !avatarModel) {
+              createAvatarMarker();
+            }
+          }
+          
+          updateDebugInfo('GPS fix iniziale ottenuto');
+        },
+        (err) => console.warn('⚠️ Errore getCurrentPosition:', err),
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      );
 
-        // GPS heading quando in movimento
-        if (typeof heading === 'number' && !Number.isNaN(heading) && use3DAvatar && avatarModel){
-          const yDeg = -(heading - 90);
-          avatarModel.setRotation({ x: 90, y: yDeg, z: 0 }); // X sempre a 90!
-        }
+      // 🆕 Poi attiva tracking continuo
+      const opts = {
+        enableHighAccuracy: true,
+        maximumAge: 1000,
+        timeout: 8000
+      };
 
-        const d = calculateDistance(smoothedLocation, newLoc);
-        if (d > 1) applyAvatarTransform(newLoc);
-        if (d > 50) map.easeTo({ center: newLoc, duration: 1000 });
-        updateDebugInfo(speed ? `Vel: ${(speed*3.6).toFixed(1)} km/h` : undefined);
-      }, (err) => {
-        statusIndicator.textContent = `Errore GPS: ${err.message}`;
-        updateDebugInfo('Errore GPS');
-      }, opts);
+      window.__gpsWatchId = navigator.geolocation.watchPosition(
+        handleGPS,
+        (err) => {
+          console.error('❌ Errore GPS tracking:', err.message);
+          setStatus(`Errore GPS: ${err.message}`, true, 3000);
+          updateDebugInfo(`GPS Err: ${err.code}`);
+        },
+        opts
+      );
+      
+      console.log('✅ GPS tracking avviato');
     }
 
-    // Pulsante Home
-    document.getElementById('goHome').addEventListener('click', () => {  
-        if (gpsTrackingActive) {
-            map.flyTo({ center: smoothedLocation, zoom: 18, pitch: 60, speed: .8 });
-        } else {
-        // Quando GPS OFF vai al default
-            map.flyTo({ center: DEFAULT_HOME, zoom: 12, pitch: 45, speed: .8 });
-        }
+    document.getElementById('goHome').addEventListener('click', () => {
+      const target = (gpsTrackingActive && smoothedLocation) ? 
+        smoothedLocation : CONFIG.DEFAULT_HOME;
+      
+      const zoom = (gpsTrackingActive && smoothedLocation) ? 18 : 12;
+      const pitch = (gpsTrackingActive && smoothedLocation) ? 60 : 45;
+      
+      map.flyTo({
+        center: target,
+        zoom: zoom,
+        pitch: pitch,
+        speed: 0.8,
+        curve: 1.5
+      });
+      
+      setStatus('Centrato su posizione');
     });
 
-    // Indicatore direzione MAPPA
     const directionIndicator = document.getElementById('directionIndicator');
-    function updateDirectionIndicator(){
-        const b = ((map.getBearing()%360)+360)%360;
-        const dirs = ['N','NE','E','SE','S','SW','W','NW'];
-        const idx = Math.round(b/45)%8;
-        const isMobile = window.innerWidth <= 768;
-        const kmh = window.__lastMoveSpeedKmh && !isMobile ? ` • ${window.__lastMoveSpeedKmh.toFixed(1)} km/h` : '';
-        directionIndicator.textContent = `${dirs[idx]} ${Math.round(b)}°${kmh}`;
-    }
+    
+    const updateDirectionIndicator = throttle(() => {
+      const b = ((map.getBearing() % 360) + 360) % 360;
+      const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+      const idx = Math.round(b / 45) % 8;
+      const isMobile = window.innerWidth <= 768;
+      const kmh = window.__lastMoveSpeedKmh && !isMobile ? 
+        ` • ${window.__lastMoveSpeedKmh.toFixed(1)} km/h` : '';
+      directionIndicator.textContent = `${dirs[idx]} ${Math.round(b)}°${kmh}`;
+    }, 250);
+
     map.on('rotate', updateDirectionIndicator);
-    window.addEventListener('resize', updateDirectionIndicator);
+    window.addEventListener('resize', debounce(updateDirectionIndicator, 500));
 
-    // Caricamento iniziale
     map.on('load', () => {
-      console.log('Mappa caricata');
+      console.log('🗺️ Mappa caricata');
 
-      // Edifici 3D
-      map.addLayer({
-        id: '3d-buildings', source: 'composite', 'source-layer': 'building',
-        filter: ['==','extrude','true'], type: 'fill-extrusion', minzoom: 15,
-        paint: {
-          'fill-extrusion-color': '#aaa',
-          'fill-extrusion-height': ['get','height'],
-          'fill-extrusion-base': ['get','min_height'],
-          'fill-extrusion-opacity': 0.6
+      const layers = map.getStyle().layers;
+      let labelLayerId;
+      for (const layer of layers) {
+        if (layer.type === 'symbol' && layer.layout && layer.layout['text-field']) {
+          labelLayerId = layer.id;
+          break;
         }
+      }
+
+      // 🆕 Edifici 3D con configurazione ottimizzata
+      map.addLayer(
+        {
+          id: '3d-buildings',
+          source: 'composite',
+          'source-layer': 'building',
+          filter: ['==', 'extrude', 'true'],
+          type: 'fill-extrusion',
+          minzoom: 15,
+          paint: {
+            'fill-extrusion-color': [
+              'interpolate',
+              ['linear'],
+              ['get', 'height'],
+              0, '#aaa',
+              50, '#999',
+              100, '#888'
+            ],
+            'fill-extrusion-height': ['get', 'height'],
+            'fill-extrusion-base': ['get', 'min_height'],
+            'fill-extrusion-opacity': 0.6
+          }
+        },
+        labelLayerId
+      );
+
+      // 🆕 Luce ottimizzata
+      map.setLight({
+        anchor: 'map',
+        color: '#ffffff',
+        intensity: 0.5,
+        position: [1.15, 210, 30]
       });
 
-      statusIndicator.textContent = 'Ottenendo posizione GPS…';
+      console.log('✅ Edifici 3D configurati');
     });
 
-    // Aggiorna debug periodico
-    setInterval(() => updateDebugInfo(), 5000);
+    document.addEventListener('keydown', (e) => {
+      switch(e.key.toLowerCase()) {
+        case 'p': // Performance monitor
+          perfMonitor.toggle();
+          break;
+        case 'h': // Home
+          document.getElementById('goHome').click();
+          break;
+        case 'g': // GPS toggle
+          gpsToggleBtn.click();
+          break;
+        case 'v': // Visibility toggle
+          visibilityToggle.click();
+          break;
+        case 'a': // Avatar 2D/3D
+          avatarToggle.click();
+          break;
+        case 'b': // Buildings
+          buildingsToggle.click();
+          break;
+      }
+    });
+
+    console.log('⌨️ Shortcuts: P=Perf, H=Home, G=GPS, V=Visibility, A=Avatar, B=Buildings');
+
+    setInterval(() => {
+      if (gpsTrackingActive) {
+        updateDebugInfo();
+      }
+    }, 5000);
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        console.log('⏸️ Tab nascosta - pausa animazioni');
+        // Pausa animazioni per risparmiare batteria
+        if (mixer) {
+          mixer.timeScale = 0;
+        }
+        // Riduce aggiornamenti GPS
+        if (gpsTrackingActive && window.__gpsWatchId) {
+          // Non stoppiamo GPS ma riduciamo priority
+          console.log('🔋 Modalità risparmio energetico attiva');
+        }
+      } else {
+        console.log('▶️ Tab visibile - riprendi animazioni');
+        // Riprendi animazioni
+        if (mixer) {
+          mixer.timeScale = 1;
+        }
+      }
+    });
+
+    window.addEventListener('error', (event) => {
+      console.error('❌ Errore globale:', event.error);
+      
+      // Recovery automatico per errori comuni
+      if (event.error && event.error.message) {
+        const msg = event.error.message.toLowerCase();
+        
+        // WebGL context loss
+        if (msg.includes('webgl') || msg.includes('context')) {
+          setStatus('Errore grafico - ricarica pagina', false);
+          console.error('💥 WebGL context perso - serve reload');
+        }
+        
+        // Out of memory
+        if (msg.includes('memory')) {
+          console.error('💾 Memoria insufficiente');
+          setStatus('Memoria insufficiente - libero risorse', true, 4000);
+          resourceManager.cleanup();
+        }
+      }
+    });
+
+    // WebGL context lost handler
+    const canvas = map.getCanvas();
+    canvas.addEventListener('webglcontextlost', (event) => {
+      event.preventDefault();
+      console.error('💥 WebGL context perso!');
+      setStatus('Errore grafico - ricaricare la pagina', false);
+    }, false);
+
+    canvas.addEventListener('webglcontextrestored', () => {
+      console.log('✅ WebGL context ripristinato');
+      setStatus('Grafica ripristinata', true, 2000);
+    }, false);
+
+    window.addEventListener('online', () => {
+      console.log('🌐 Connessione ripristinata');
+      setStatus('Connessione ristabilita', true, 2000);
+      
+      // Riprendi GPS se era attivo
+      if (gpsTrackingActive && !window.__gpsWatchId) {
+        resumeGPSTracking();
+      }
+    });
+
+    window.addEventListener('offline', () => {
+      console.log('📡 Connessione persa');
+      setStatus('Modalità offline - mappe in cache', true, 4000);
+    });
+
+    window.addEventListener('orientationchange', debounce(() => {
+      console.log('📱 Orientamento cambiato');
+      
+      // Forza ridisegno mappa
+      setTimeout(() => {
+        map.resize();
+        updateDirectionIndicator();
+      }, 200);
+    }, 300));
+
+    if ('getBattery' in navigator) {
+      navigator.getBattery().then((battery) => {
+        console.log(`🔋 Batteria: ${(battery.level * 100).toFixed(0)}%`);
+        
+        // Modalità risparmio energetico se batteria bassa
+        function checkBattery() {
+          if (battery.level < 0.2 && !battery.charging) {
+            console.warn('⚠️ Batteria bassa - riduco aggiornamenti');
+            
+            // Riduce qualità se batteria < 20%
+            if (use3DAvatar && avatarModel) {
+              // Potresti ridurre qualità rendering qui
+              setStatus('Batteria bassa - modalità risparmio', true, 3000);
+            }
+          }
+        }
+        
+        battery.addEventListener('levelchange', checkBattery);
+        battery.addEventListener('chargingchange', checkBattery);
+        
+        checkBattery();
+      }).catch(err => {
+        console.log('Battery API non disponibile:', err);
+      });
+    }
+    console.group('📊 Statistiche App');
+    console.log('Device:', /Mobile|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'Mobile' : 'Desktop');
+    console.log('Platform:', navigator.platform);
+    console.log('Screen:', `${window.screen.width}x${window.screen.height}`);
+    console.log('Viewport:', `${window.innerWidth}x${window.innerHeight}`);
+    console.log('DPR:', window.devicePixelRatio);
+    console.log('Touch:', 'ontouchstart' in window ? 'Si' : 'No');
+    console.log('WebGL:', document.createElement('canvas').getContext('webgl') ? 'Supportato' : 'Non supportato');
+    console.log('Memoria:', performance.memory ? `${(performance.memory.jsHeapSizeLimit / 1048576).toFixed(0)} MB` : 'N/A');
+    console.groupEnd();
   </script>
 </body>
 </html>
