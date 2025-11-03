@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mappa 3D con Avatar – Ottimizzata</title>
-
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>App con Login e Mappa 3D</title>
+  
   <!-- Mapbox GL JS -->
   <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
   <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
@@ -15,42 +15,299 @@
   <!-- Threebox -->
   <link href="https://cdn.jsdelivr.net/gh/jscastro76/threebox@v.2.2.2/dist/threebox.css" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/gh/jscastro76/threebox@v.2.2.2/dist/threebox.min.js"></script>
-
+  
   <style>
-    :root {
-      --panel-bg: rgba(255,255,255,.9);
-      --shadow: 0 2px 6px rgba(0,0,0,.2);
-      --radius: 12px;
-      --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      
-      /* Dimensioni responsive */
-      --button-size: clamp(36px, 5vw, 44px);
-      --font-size-small: clamp(11px, 2vw, 12px);
-      --font-size-normal: clamp(13px, 2.5vw, 14px);
-      --padding-small: clamp(6px, 1.5vw, 8px);
-      --padding-normal: clamp(8px, 2vw, 12px);
-      --gap-small: clamp(8px, 1.5vw, 10px);
-      --gap-normal: clamp(10px, 2vw, 15px);
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
     }
-    
-    *{box-sizing:border-box}
-    body { margin: 0; font-family: var(--font); }
-    #map { position: absolute; inset: 0; }
 
-    .avatar-marker {
-      background-image: url('https://cdn-icons-png.flaticon.com/512/149/149071.png');
-      background-size: cover;
-      width: clamp(30px, 5vw, 40px);
-      height: clamp(30px, 5vw, 40px);
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      overflow: hidden;
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       SCHERMATA LOGIN
+       ═══════════════════════════════════════════════════════════ */
+    #loginScreen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+
+    #loginScreen.hidden {
+      opacity: 0;
+      transform: scale(0.95);
+      pointer-events: none;
+    }
+
+    .login-container {
+      background: white;
+      padding: 40px;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      width: 90%;
+      max-width: 500px; /* 🆕 Aumentato per form registrazione */
+      animation: slideUp 0.5s ease;
+      max-height: 90vh; /* 🆕 Per scroll su mobile */
+      overflow-y: auto; /* 🆕 Scroll se contenuto troppo alto */
+    }
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .login-header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .login-header h1 {
+      color: #333;
+      font-size: 28px;
+      margin-bottom: 10px;
+    }
+
+    .login-header p {
+      color: #666;
+      font-size: 14px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      color: #333;
+      font-weight: 500;
+      font-size: 14px;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 12px 15px;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .login-button {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .login-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    .login-button:active {
+      transform: translateY(0);
+    }
+
+    .error-message {
+      color: #e74c3c;
+      font-size: 14px;
+      margin-top: 10px;
+      text-align: center;
+      display: none;
+      animation: shake 0.5s;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-10px); }
+      75% { transform: translateX(10px); }
+    }
+
+    .error-message.show {
+      display: block;
+    }
+
+    /* Form row per campi affiancati */
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .form-row .form-group {
+      margin-bottom: 0;
+    }
+
+    /* Select styling */
+    .form-group select {
+      width: 100%;
+      padding: 12px 15px;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+      background: white;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .form-group select:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    /* Color palette */
+    .color-palette {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    .color-option {
+      width: 100%;
+      aspect-ratio: 1;
       border-radius: 50%;
-      border: 2px solid #fff;
-      box-shadow: var(--shadow);
-      /* Transizione smooth per visibilità */
-      transition: opacity 0.3s ease, transform 0.3s ease;
+      cursor: pointer;
+      transition: all 0.3s;
+      border: 3px solid transparent;
+      position: relative;
     }
 
-    /* Loading spinner migliorato */
-    .loading-overlay {
+    .color-option:hover {
+      transform: scale(1.1);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+
+    .color-option.selected {
+      border-color: white;
+      box-shadow: 0 0 0 3px currentColor, 0 4px 12px rgba(0,0,0,0.3);
+      transform: scale(1.15);
+    }
+
+    .color-option.selected::after {
+      content: '✓';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      font-size: 20px;
+      font-weight: bold;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    }
+
+    /* Avatar preview */
+    .avatar-preview {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 10px;
+      margin-top: 10px;
+    }
+
+    .preview-icon {
+      width: 80px;
+      height: 80px;
+      background: #ccc;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      font-size: 36px;
+      transition: all 0.3s;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .avatar-preview p {
+      margin: 0;
+      color: #666;
+      font-size: 14px;
+    }
+
+    /* Toggle form link */
+    .toggle-form {
+      margin-top: 20px;
+      text-align: center;
+      font-size: 14px;
+      color: #666;
+    }
+
+    .toggle-form a {
+      color: #667eea;
+      text-decoration: none;
+      font-weight: 600;
+      transition: color 0.3s;
+    }
+
+    .toggle-form a:hover {
+      color: #764ba2;
+      text-decoration: underline;
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       SCHERMATA PRINCIPALE (Mappa 3D)
+       ═══════════════════════════════════════════════════════════ */
+    #mainScreen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: none;
+    }
+
+    #mainScreen.active {
+      display: block;
+    }
+
+    /* Mappa Mapbox */
+    #map {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Loading overlay mappa */
+    .loading-overlay-map {
       position: fixed;
       top: 0;
       left: 0;
@@ -64,241 +321,125 @@
       backdrop-filter: blur(4px);
     }
     
-    .loading-overlay.active {
+    .loading-overlay-map.active {
       display: flex;
     }
-    
-    .loading-content {
-      text-align: center;
-      color: white;
-    }
-    
-    .spinner {
-      border: 4px solid rgba(255,255,255,0.3);
-      border-top: 4px solid white;
-      border-radius: 50%;
-      width: 50px;
-      height: 50px;
-      animation: spin 1s linear infinite;
-      margin: 0 auto 15px;
-    }
-    
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-    
-    .loading-text {
-      font-size: 16px;
-      font-weight: 500;
-    }
-    
-    .loading-progress {
-      margin-top: 10px;
-      font-size: 14px;
-      opacity: 0.8;
+
+    /* Status indicator mappa */
+    .status-indicator-map {
+      position: absolute;
+      top: 70px;
+      right: 20px;
+      background: rgba(0,0,0,.85);
+      color: #fff;
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 13px;
+      z-index: 1000;
+      max-width: 260px;
+      transition: opacity 0.3s ease;
     }
 
-    /* Media query per schermi piccoli */
-    @media (max-width: 768px) {
-      .custom-controls {
-        bottom: 10px !important;
-        right: 10px !important;
-        flex-direction: column !important;
-        padding: var(--padding-small) !important;
-      }
-      
-      .custom-controls button {
-        font-size: 16px !important;
-        padding: 6px !important;
-        width: var(--button-size);
-        height: var(--button-size);
-      }
-      
-      .pitch-slider {
-        width: 60px !important;
-        height: 30px !important;
-      }
-      
-      .top-right-controls {
-        top: 10px !important;
-        right: 10px !important;
-        flex-direction: column !important;
-        align-items: flex-end !important;
-      }
-      
-      .direction-indicator {
-        font-size: var(--font-size-small) !important;
-        padding: var(--padding-small) !important;
-        max-width: 150px !important;
-        white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-      }
-      
-      .status-indicator {
-        top: 60px !important;
-        right: 10px !important;
-        max-width: 200px !important;
-        font-size: var(--font-size-small) !important;
-      }
-      
-      .debug-info {
-        bottom: 70px !important;
-        left: 10px !important;
-        max-width: 250px !important;
-        font-size: 10px !important;
-      }
-      
-      .gps-controls {
-        gap: var(--gap-small) !important;
-      }
-    }
-
-    .custom-controls {
-      position: absolute; 
-      bottom: 20px; 
-      right: 50px;
-      display: flex; 
-      gap: var(--gap-small); 
-      align-items: center;
-      background: var(--panel-bg);
-      padding: var(--padding-small); 
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
+    /* GPS controls mappa */
+    .gps-controls-map {
+      position: absolute;
+      top: 90px;
+      left: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
       z-index: 1000;
     }
-    
-    .custom-controls button {
-      font-size: clamp(16px, 3vw, 18px); 
-      padding: 4px 10px; 
+
+    .gps-controls-map button {
+      background: rgba(255,255,255,.9);
       border: none;
-      background: white; 
-      border-radius: 8px; 
+      padding: 10px 16px;
+      border-radius: 10px;
       cursor: pointer;
-      transition: background 0.2s;
-    }
-    
-    .custom-controls button:hover {
-      background: #f0f0f0;
-    }
-    
-    .pitch-slider { 
-      width: clamp(40px, 8vw, 60px); 
+      box-shadow: 0 2px 6px rgba(0,0,0,.2);
+      font-size: 14px;
+      transition: all 0.2s;
+      font-family: var(--font);
     }
 
-    .top-right-controls {
-      position: absolute; 
-      top: 20px; 
+    .gps-controls-map button:hover {
+      transform: translateX(2px);
+      box-shadow: 0 3px 8px rgba(0,0,0,.3);
+    }
+
+    .gps-button.active {
+      background: #4CAF50;
+      color: #fff;
+    }
+
+    .visibility-button.hidden {
+      background: #ff9800;
+      color: #fff;
+    }
+
+    /* Top right controls mappa */
+    .top-right-controls-map {
+      position: absolute;
+      top: 20px;
       right: 20px;
-      display: flex; 
-      gap: var(--gap-small); 
-      align-items: center; 
+      display: flex;
+      gap: 10px;
+      align-items: center;
       z-index: 1000;
       flex-wrap: wrap;
       justify-content: flex-end;
     }
-    
-    .direction-indicator {
-      background: rgba(0,0,0,.7); 
-      color: #fff;
-      padding: var(--padding-small) var(--padding-normal); 
-      border-radius: 20px; 
-      font-size: var(--font-size-normal); 
-      font-weight: 600;
-      backdrop-filter: blur(8px);
-    }
-    
-    .home-button, .avatar-toggle {
-      background: white; 
-      border: none; 
-      padding: var(--padding-small) var(--padding-normal); 
-      font-size: var(--font-size-normal);
-      border-radius: 10px; 
-      box-shadow: var(--shadow); 
+
+    .top-right-controls-map button {
+      background: white;
+      border: none;
+      padding: 10px 16px;
+      font-size: 14px;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,.2);
       cursor: pointer;
       transition: all 0.2s;
+      font-family: var(--font);
     }
-    
-    .home-button:hover, .avatar-toggle:hover {
+
+    .top-right-controls-map button:hover {
       transform: translateY(-1px);
       box-shadow: 0 3px 8px rgba(0,0,0,.25);
     }
 
-    .status-indicator {
-      position: absolute; 
-      top: 70px; 
-      right: 20px;
-      background: rgba(0,0,0,.85); 
-      color:#fff; 
-      padding: var(--padding-normal); 
-      border-radius: 10px;
-      font-size: var(--font-size-small); 
-      z-index: 1000; 
-      max-width: 260px;
-      /* 🆕 MODIFICA 3: Animazione fade in/out */
-      transition: opacity 0.3s ease;
+    .direction-indicator-map {
+      background: rgba(0,0,0,.7);
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 600;
+      backdrop-filter: blur(8px);
     }
 
-    .gps-controls {
-      position: absolute; 
-      top: 20px; 
-      left: 20px; 
-      display: flex; 
-      flex-direction: column; 
-      gap: var(--gap-small); 
-      z-index: 1000;
-    }
-    
-    .gps-button, .visibility-button { 
-      background: var(--panel-bg); 
-      border: none; 
-      padding: var(--padding-small) var(--padding-normal); 
-      border-radius: 10px; 
-      cursor: pointer; 
-      box-shadow: var(--shadow);
-      font-size: var(--font-size-normal);
-      transition: all 0.2s;
-    }
-    
-    .gps-button:hover, .visibility-button:hover {
-      transform: translateX(2px);
-    }
-    
-    .gps-button.active { 
-      background: #4CAF50; 
-      color: #fff; 
-    }
-    
-    .visibility-button.hidden { 
-      background: #ff9800; 
-      color: #fff; 
+    .home-button-map {
+      background: white;
     }
 
-    .debug-info {
-      position: absolute; 
-      bottom: 20px; 
-      left: 20px; 
+    /* Debug info mappa */
+    .debug-info-map {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
       background: rgba(0,0,0,.85);
-      color: #fff; 
-      padding: var(--padding-normal); 
-      border-radius: 10px; 
+      color: #fff;
+      padding: 12px;
+      border-radius: 10px;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: var(--font-size-small); 
-      max-width: 320px; 
-      z-index: 1000; 
+      font-size: 12px;
+      max-width: 320px;
+      z-index: 1000;
       white-space: pre-line;
     }
-    
-    /* Classe per nascondere avatar/marker */
-    .avatar-hidden {
-      opacity: 0 !important;
-      transform: scale(0.8) !important;
-      pointer-events: none !important;
-    }
 
-    /* Performance indicator */
-    .performance-indicator {
+    /* Performance indicator mappa */
+    .performance-indicator-map {
       position: absolute;
       bottom: 20px;
       right: 20px;
@@ -311,380 +452,1999 @@
       z-index: 1000;
       display: none;
     }
-    
-    .performance-indicator.show {
+
+    .performance-indicator-map.show {
       display: block;
     }
 
+    /* Zoom controls mappa */
+    .custom-controls-map {
+      position: absolute;
+      bottom: 20px;
+      right: 50px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      background: rgba(255,255,255,.9);
+      padding: 8px;
+      border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,.2);
+      z-index: 1000;
+    }
+
+    .custom-controls-map button {
+      font-size: 18px;
+      padding: 4px 10px;
+      border: none;
+      background: white;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+      font-family: var(--font);
+    }
+
+    .custom-controls-map button:hover {
+      background: #f0f0f0;
+    }
+
+    .pitch-slider {
+      width: 60px;
+      cursor: pointer;
+    }
+
+    /* Avatar marker */
+    .avatar-marker {
+      background-image: url('https://cdn-icons-png.flaticon.com/512/149/149071.png');
+      background-size: cover;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 2px solid #fff;
+      box-shadow: 0 2px 6px rgba(0,0,0,.2);
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+
+    .avatar-marker.avatar-hidden {
+      opacity: 0;
+      transform: scale(0.8);
+      pointer-events: none;
+    }
+
+    /* Pulsante hamburger (3 righe) in alto a sinistra */
+    .hamburger-button {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      width: 50px;
+      height: 50px;
+      background: white;
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.3s;
+      z-index: 10000; /* Sopra tutti gli elementi della mappa */
+    }
+
+    .hamburger-button:hover {
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+      transform: translateY(-2px);
+    }
+
+    .hamburger-line {
+      width: 24px;
+      height: 3px;
+      background: #333;
+      border-radius: 2px;
+      transition: all 0.3s;
+    }
+
+    .hamburger-button:hover .hamburger-line {
+      background: #667eea;
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       MENU LATERALE (Sidebar)
+       ═══════════════════════════════════════════════════════════ */
+    #sidebar {
+      position: fixed;
+      top: 0;
+      left: -350px;
+      width: 350px;
+      height: 100%;
+      background: white;
+      box-shadow: 4px 0 20px rgba(0, 0, 0, 0.1);
+      transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 1000;
+      overflow-y: auto;
+    }
+
+    #sidebar.open {
+      left: 0;
+    }
+
+    /* Overlay scuro quando sidebar aperta */
+    #overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s;
+      z-index: 999;
+    }
+
+    #overlay.active {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    /* Header sidebar con X */
+    .sidebar-header {
+      padding: 30px 25px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      position: relative;
+    }
+
+    .close-button {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 35px;
+      height: 35px;
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-size: 24px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s;
+    }
+
+    .close-button:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: rotate(90deg);
+    }
+
+    .sidebar-header h2 {
+      font-size: 24px;
+      margin-bottom: 5px;
+    }
+
+    .sidebar-header p {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Sezione profilo */
+    .profile-section {
+      padding: 25px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .profile-section h3 {
+      color: #333;
+      font-size: 18px;
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .profile-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      font-size: 18px;
+    }
+
+    .profile-info {
+      margin-top: 15px;
+    }
+
+    .profile-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      color: #666;
+      font-size: 14px;
+    }
+
+    .profile-item strong {
+      color: #333;
+    }
+
+    /* Sezione impostazioni */
+    .settings-section {
+      padding: 25px;
+    }
+
+    .settings-section h3 {
+      color: #333;
+      font-size: 18px;
+      margin-bottom: 15px;
+    }
+
+    .setting-item {
+      padding: 15px;
+      background: #f8f9fa;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: all 0.3s;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .setting-item:hover {
+      background: #e9ecef;
+      transform: translateX(5px);
+    }
+
+    .setting-icon {
+      width: 40px;
+      height: 40px;
+      background: white;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+
+    .setting-content {
+      flex: 1;
+    }
+
+    .setting-content h4 {
+      color: #333;
+      font-size: 15px;
+      margin-bottom: 3px;
+    }
+
+    .setting-content p {
+      color: #666;
+      font-size: 12px;
+    }
+
+    /* Pulsante logout */
+    .logout-section {
+      padding: 25px;
+      border-top: 1px solid #e0e0e0;
+    }
+
+    .logout-button {
+      width: 100%;
+      padding: 14px;
+      background: #e74c3c;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .logout-button:hover {
+      background: #c0392b;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       RESPONSIVE - DIMENSIONI DINAMICHE PC/MOBILE
+       ═══════════════════════════════════════════════════════════ */
+    
+    /* DESKTOP (oltre 1024px) */
+    @media (min-width: 1025px) {
+      .login-container {
+        max-width: 450px;
+        padding: 50px;
+      }
+
+      .login-header h1 {
+        font-size: 32px;
+      }
+
+      #sidebar {
+        width: 400px;
+        left: -400px;
+      }
+
+      .hamburger-button {
+        width: 55px;
+        height: 55px;
+        top: 25px;
+        left: 25px;
+      }
+
+      .hamburger-line {
+        width: 28px;
+        height: 3px;
+      }
+
+      .sidebar-header {
+        padding: 40px 30px;
+      }
+
+      .sidebar-header h2 {
+        font-size: 28px;
+      }
+
+      .profile-section,
+      .settings-section,
+      .logout-section {
+        padding: 30px;
+      }
+
+      .setting-item {
+        padding: 18px;
+      }
+
+      .close-button {
+        width: 40px;
+        height: 40px;
+        top: 25px;
+        right: 25px;
+      }
+    }
+
+    /* TABLET (768px - 1024px) */
+    @media (min-width: 768px) and (max-width: 1024px) {
+      .login-container {
+        max-width: 420px;
+        padding: 40px 35px;
+      }
+
+      .login-header h1 {
+        font-size: 30px;
+      }
+
+      #sidebar {
+        width: 380px;
+        left: -380px;
+      }
+
+      .hamburger-button {
+        width: 52px;
+        height: 52px;
+        top: 22px;
+        left: 22px;
+      }
+
+      .hamburger-line {
+        width: 26px;
+      }
+
+      .sidebar-header {
+        padding: 35px 28px;
+      }
+
+      .sidebar-header h2 {
+        font-size: 26px;
+      }
+
+      .profile-section,
+      .settings-section,
+      .logout-section {
+        padding: 28px;
+      }
+
+      .setting-item {
+        padding: 16px;
+      }
+
+      .close-button {
+        width: 38px;
+        height: 38px;
+        top: 22px;
+        right: 22px;
+      }
+    }
+
+    /* MOBILE LANDSCAPE (481px - 767px) */
+    @media (min-width: 481px) and (max-width: 767px) {
+      .login-container {
+        max-width: 400px;
+        padding: 35px 25px;
+      }
+
+      .login-header h1 {
+        font-size: 26px;
+      }
+
+      #sidebar {
+        width: 85%;
+        max-width: 350px;
+        left: -85%;
+      }
+
+      .hamburger-button {
+        width: 48px;
+        height: 48px;
+        top: 18px;
+        left: 18px;
+      }
+
+      .hamburger-line {
+        width: 24px;
+      }
+
+      .sidebar-header {
+        padding: 30px 25px;
+      }
+
+      .sidebar-header h2 {
+        font-size: 24px;
+      }
+
+      .profile-section,
+      .settings-section,
+      .logout-section {
+        padding: 25px;
+      }
+
+      .setting-item {
+        padding: 14px;
+      }
+
+      .setting-icon {
+        width: 38px;
+        height: 38px;
+        font-size: 18px;
+      }
+
+      .close-button {
+        width: 36px;
+        height: 36px;
+        top: 18px;
+        right: 18px;
+        font-size: 22px;
+      }
+    }
+
+    /* MOBILE PORTRAIT (fino a 480px) */
+    @media (max-width: 480px) {
+      .login-container {
+        width: 95%;
+        max-width: 350px;
+        padding: 30px 20px;
+        max-height: 85vh; /* Più spazio su mobile */
+      }
+
+      .login-header h1 {
+        font-size: 24px;
+      }
+
+      .login-header p {
+        font-size: 13px;
+      }
+
+      .form-group label {
+        font-size: 13px;
+      }
+
+      .form-group input {
+        padding: 11px 13px;
+        font-size: 15px;
+      }
+
+      .login-button {
+        padding: 12px;
+        font-size: 15px;
+      }
+
+      /* Form row stacked su mobile */
+      .form-row {
+        grid-template-columns: 1fr;
+        gap: 0;
+      }
+
+      .form-row .form-group {
+        margin-bottom: 20px;
+      }
+
+      /* Color palette più piccola */
+      .color-palette {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+      }
+
+      .preview-icon {
+        width: 60px;
+        height: 60px;
+        font-size: 28px;
+      }
+
+      /* Sidebar occupa tutta la larghezza su mobile piccolo */
+      #sidebar {
+        width: 100%;
+        left: -100%;
+      }
+
+      .hamburger-button {
+        width: 45px;
+        height: 45px;
+        top: 15px;
+        left: 15px;
+      }
+
+      .hamburger-line {
+        width: 22px;
+        height: 2.5px;
+        gap: 5px;
+      }
+
+      .sidebar-header {
+        padding: 25px 20px;
+      }
+
+      .sidebar-header h2 {
+        font-size: 22px;
+      }
+
+      .sidebar-header p {
+        font-size: 13px;
+      }
+
+      .close-button {
+        width: 34px;
+        height: 34px;
+        top: 15px;
+        right: 15px;
+        font-size: 20px;
+      }
+
+      .profile-section,
+      .settings-section,
+      .logout-section {
+        padding: 20px;
+      }
+
+      .profile-section h3,
+      .settings-section h3 {
+        font-size: 16px;
+      }
+
+      .profile-icon {
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
+      }
+
+      .profile-item {
+        font-size: 13px;
+        padding: 8px 0;
+      }
+
+      .setting-item {
+        padding: 12px;
+        margin-bottom: 8px;
+      }
+
+      .setting-icon {
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
+      }
+
+      .setting-content h4 {
+        font-size: 14px;
+      }
+
+      .setting-content p {
+        font-size: 11px;
+      }
+
+      .logout-button {
+        padding: 12px;
+        font-size: 14px;
+      }
+      
+      /* MAPPA - Mobile adjustments */
+      .gps-controls-map {
+        top: 15px;
+        left: 15px;
+        gap: 8px;
+      }
+      
+      .gps-controls-map button {
+        padding: 8px 12px;
+        font-size: 12px;
+      }
+      
+      .top-right-controls-map {
+        top: 15px;
+        right: 15px;
+        gap: 8px;
+      }
+      
+      .top-right-controls-map button {
+        padding: 8px 12px;
+        font-size: 12px;
+      }
+      
+      .direction-indicator-map {
+        padding: 8px 12px;
+        font-size: 12px;
+      }
+      
+      .status-indicator-map {
+        top: 60px;
+        right: 15px;
+        padding: 10px 12px;
+        font-size: 12px;
+        max-width: 200px;
+      }
+      
+      .debug-info-map {
+        bottom: 15px;
+        left: 15px;
+        padding: 10px;
+        font-size: 10px;
+        max-width: 250px;
+      }
+      
+      .custom-controls-map {
+        bottom: 15px;
+        right: 15px;
+        padding: 6px;
+        gap: 6px;
+      }
+      
+      .custom-controls-map button {
+        padding: 4px 8px;
+        font-size: 16px;
+      }
+      
+      .pitch-slider {
+        width: 50px;
+      }
+      
+      .performance-indicator-map {
+        bottom: 15px;
+        right: 15px;
+        font-size: 10px;
+        padding: 6px 10px;
+      }
+    }
+
+    /* MOBILE MOLTO PICCOLO (fino a 360px) */
+    @media (max-width: 360px) {
+      .login-container {
+        width: 98%;
+        padding: 25px 15px;
+      }
+
+      .login-header h1 {
+        font-size: 22px;
+      }
+
+      .hamburger-button {
+        width: 42px;
+        height: 42px;
+        top: 12px;
+        left: 12px;
+      }
+
+      .hamburger-line {
+        width: 20px;
+      }
+
+      .sidebar-header {
+        padding: 20px 15px;
+      }
+
+      .sidebar-header h2 {
+        font-size: 20px;
+      }
+
+      .close-button {
+        width: 32px;
+        height: 32px;
+        top: 12px;
+        right: 12px;
+        font-size: 18px;
+      }
+
+      .profile-section,
+      .settings-section,
+      .logout-section {
+        padding: 15px;
+      }
+
+      .profile-section h3,
+      .settings-section h3 {
+        font-size: 15px;
+      }
+
+      .profile-icon {
+        width: 32px;
+        height: 32px;
+        font-size: 14px;
+      }
+
+      .setting-item {
+        padding: 10px;
+        gap: 10px;
+      }
+
+      .setting-icon {
+        width: 32px;
+        height: 32px;
+        font-size: 14px;
+      }
+
+      .setting-content h4 {
+        font-size: 13px;
+      }
+
+      .setting-content p {
+        font-size: 10px;
+      }
+    }
+
+    /* LARGE DESKTOP (oltre 1440px) */
+    @media (min-width: 1441px) {
+      .login-container {
+        max-width: 500px;
+        padding: 60px;
+      }
+
+      .login-header h1 {
+        font-size: 36px;
+      }
+
+      .login-header p {
+        font-size: 16px;
+      }
+
+      .form-group label {
+        font-size: 15px;
+      }
+
+      .form-group input {
+        padding: 14px 16px;
+        font-size: 17px;
+      }
+
+      .login-button {
+        padding: 16px;
+        font-size: 17px;
+      }
+
+      #sidebar {
+        width: 450px;
+        left: -450px;
+      }
+
+      .hamburger-button {
+        width: 60px;
+        height: 60px;
+        top: 30px;
+        left: 30px;
+      }
+
+      .hamburger-line {
+        width: 30px;
+        height: 4px;
+      }
+
+      .sidebar-header {
+        padding: 45px 35px;
+      }
+
+      .sidebar-header h2 {
+        font-size: 30px;
+      }
+
+      .sidebar-header p {
+        font-size: 16px;
+      }
+
+      .close-button {
+        width: 45px;
+        height: 45px;
+        top: 30px;
+        right: 30px;
+        font-size: 28px;
+      }
+
+      .profile-section,
+      .settings-section,
+      .logout-section {
+        padding: 35px;
+      }
+
+      .profile-section h3,
+      .settings-section h3 {
+        font-size: 20px;
+      }
+
+      .profile-icon {
+        width: 45px;
+        height: 45px;
+        font-size: 20px;
+      }
+
+      .profile-item {
+        font-size: 15px;
+        padding: 12px 0;
+      }
+
+      .setting-item {
+        padding: 20px;
+        margin-bottom: 12px;
+      }
+
+      .setting-icon {
+        width: 45px;
+        height: 45px;
+        font-size: 22px;
+      }
+
+      .setting-content h4 {
+        font-size: 16px;
+      }
+
+      .setting-content p {
+        font-size: 13px;
+      }
+
+      .logout-button {
+        padding: 16px;
+        font-size: 16px;
+      }
+    }
+
+    /* ORIENTAMENTO (Landscape su mobile) */
+    @media (max-height: 500px) and (orientation: landscape) {
+      .login-container {
+        max-height: 90vh;
+        overflow-y: auto;
+        padding: 20px;
+      }
+
+      .login-header h1 {
+        font-size: 20px;
+        margin-bottom: 5px;
+      }
+
+      .login-header p {
+        font-size: 12px;
+      }
+
+      .form-group {
+        margin-bottom: 12px;
+      }
+
+      .form-group input {
+        padding: 8px 12px;
+      }
+
+      .login-button {
+        padding: 10px;
+      }
+
+      #sidebar {
+        overflow-y: auto;
+      }
+
+      .sidebar-header {
+        padding: 15px 20px;
+      }
+
+      .profile-section,
+      .settings-section,
+      .logout-section {
+        padding: 15px 20px;
+      }
+
+      .setting-item {
+        padding: 10px;
+        margin-bottom: 6px;
+      }
+    }
+
+    /* TOUCH DEVICES - Area tocco più grande */
+    @media (hover: none) and (pointer: coarse) {
+      .hamburger-button,
+      .close-button,
+      .setting-item {
+        /* Aumenta area touch per dispositivi touch */
+        min-height: 44px; /* Apple Human Interface Guidelines */
+      }
+
+      .login-button,
+      .logout-button {
+        min-height: 48px;
+      }
+    }
   </style>
 </head>
 <body>
-  <div id="map"></div>
 
-  <!-- Loading overlay migliorato -->
-  <div class="loading-overlay" id="loadingOverlay">
-    <div class="loading-content">
-      <div class="spinner"></div>
-      <div class="loading-text" id="loadingText">Caricamento avatar...</div>
-      <div class="loading-progress" id="loadingProgress">0%</div>
+  <!-- ═══════════════════════════════════════════════════════════
+       SCHERMATA LOGIN
+       ═══════════════════════════════════════════════════════════ -->
+  <div id="loginScreen">
+    <div class="login-container">
+      <div class="login-header">
+        <h1>🚶🚶🏽‍♀️‍➡️ Benvenuto su MeetGo</h1>
+        <p id="loginSubtitle">Accedi per continuare</p>
+      </div>
+      
+      <!-- FORM LOGIN -->
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input 
+            type="text" 
+            id="username" 
+            placeholder="Inserisci username"
+            autocomplete="username"
+            required
+          >
+        </div>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input 
+            type="password" 
+            id="password" 
+            placeholder="Inserisci password"
+            autocomplete="current-password"
+            required
+          >
+        </div>
+        <button type="submit" class="login-button">Accedi</button>
+        <div class="error-message" id="errorMessage">
+          ❌ Username o password errati
+        </div>
+      </form>
+
+      <!-- FORM REGISTRAZIONE (nascosto inizialmente) -->
+      <form id="registerForm" style="display: none;">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="regNome">Nome *</label>
+            <input 
+              type="text" 
+              id="regNome" 
+              placeholder="Mario"
+              required
+            >
+          </div>
+          <div class="form-group">
+            <label for="regCognome">Cognome *</label>
+            <input 
+              type="text" 
+              id="regCognome" 
+              placeholder="Rossi"
+              required
+            >
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="regDataNascita">Data di Nascita *</label>
+            <input 
+              type="date" 
+              id="regDataNascita" 
+              required
+            >
+          </div>
+          <div class="form-group">
+            <label for="regSesso">Sesso *</label>
+            <select id="regSesso" required>
+              <option value="">Seleziona</option>
+              <option value="M">Maschio</option>
+              <option value="F">Femmina</option>
+              <option value="Altro">Altro</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="regEmail">Email *</label>
+          <input 
+            type="email" 
+            id="regEmail" 
+            placeholder="mario.rossi@example.com"
+            required
+          >
+        </div>
+
+        <div class="form-group">
+          <label for="regUsername">Username *</label>
+          <input 
+            type="text" 
+            id="regUsername" 
+            placeholder="mario_rossi"
+            required
+          >
+        </div>
+
+        <div class="form-group">
+          <label for="regPassword">Password *</label>
+          <input 
+            type="password" 
+            id="regPassword" 
+            placeholder="Minimo 6 caratteri"
+            minlength="6"
+            required
+          >
+        </div>
+
+        <div class="form-group">
+          <label for="regPasswordConfirm">Conferma Password *</label>
+          <input 
+            type="password" 
+            id="regPasswordConfirm" 
+            placeholder="Ripeti password"
+            minlength="6"
+            required
+          >
+        </div>
+
+        <div class="form-group">
+          <label>Colore Avatar *</label>
+          <div class="color-palette" id="colorPalette">
+            <div class="color-option" data-color="#667eea" style="background: #667eea"></div>
+            <div class="color-option" data-color="#e74c3c" style="background: #e74c3c"></div>
+            <div class="color-option" data-color="#3498db" style="background: #3498db"></div>
+            <div class="color-option" data-color="#2ecc71" style="background: #2ecc71"></div>
+            <div class="color-option" data-color="#f39c12" style="background: #f39c12"></div>
+            <div class="color-option" data-color="#9b59b6" style="background: #9b59b6"></div>
+            <div class="color-option" data-color="#1abc9c" style="background: #1abc9c"></div>
+            <div class="color-option" data-color="#e91e63" style="background: #e91e63"></div>
+            <div class="color-option" data-color="#ff5722" style="background: #ff5722"></div>
+            <div class="color-option" data-color="#795548" style="background: #795548"></div>
+            <div class="color-option" data-color="#607d8b" style="background: #607d8b"></div>
+            <div class="color-option" data-color="#ff9800" style="background: #ff9800"></div>
+          </div>
+          <input type="hidden" id="selectedColor" required>
+          <div class="avatar-preview" id="avatarPreview">
+            <div class="preview-icon" id="previewIcon">?</div>
+            <p>Anteprima Avatar</p>
+          </div>
+        </div>
+
+        <button type="submit" class="login-button">Registrati</button>
+        <div class="error-message" id="registerError">
+          ❌ Errore nella registrazione
+        </div>
+      </form>
+
+      <!-- Toggle Login/Registrazione -->
+      <div class="toggle-form">
+        <p id="toggleText">Non hai un account? <a href="#" id="toggleLink">Registrati</a></p>
+      </div>
+      
+      <div style="margin-top: 20px; text-align: center; font-size: 12px; color: #999;">
+        💡 <strong>Account demo:</strong><br>
+        👤 user / user123<br>
+        👤 admin / admin123
+      </div>
     </div>
   </div>
 
-  <div class="status-indicator" id="statusIndicator">Caricamento…</div>
+  <!-- ═══════════════════════════════════════════════════════════
+       SCHERMATA PRINCIPALE (Mappa 3D)
+       ═══════════════════════════════════════════════════════════ -->
+  <div id="mainScreen">
+    <!-- Mappa Mapbox -->
+    <div id="map"></div>
 
-  <div class="gps-controls">
-    <button class="gps-button active" id="gpsToggle">📍 GPS ON</button>
-    <button class="visibility-button" id="visibilityToggle">Visibilità ON</button>
+    <!-- Loading overlay per avatar -->
+    <div class="loading-overlay-map" id="loadingOverlay">
+      <div class="loading-content">
+        <div class="spinner"></div>
+        <div class="loading-text" id="loadingText">Caricamento avatar...</div>
+        <div class="loading-progress" id="loadingProgress">0%</div>
+      </div>
+    </div>
+
+    <!-- Status indicator -->
+    <div class="status-indicator-map" id="statusIndicator">Caricamento…</div>
+
+    <!-- GPS controls -->
+    <div class="gps-controls-map">
+      <button class="gps-button active" id="gpsToggle">📍 GPS ON</button>
+      <button class="visibility-button" id="visibilityToggle">👁️ Avatar ON</button>
+    </div>
+
+    <!-- Top right controls -->
+    <div class="top-right-controls-map">
+      <button class="avatar-toggle" id="avatarToggle">👤 3D</button>
+      <button class="avatar-toggle" id="buildingsToggle">🏙️ 3D On</button>
+      <button class="home-button-map" id="goHome">🏠</button>
+      <div class="direction-indicator-map" id="directionIndicator">N 0°</div>
+    </div>
+
+    <!-- Debug info -->
+    <div class="debug-info-map" id="debugInfo">Debug GPS: Caricamento…</div>
+
+    <!-- Performance monitor -->
+    <div class="performance-indicator-map" id="performanceIndicator">
+      FPS: 60 | Mem: 0 MB
+    </div>
+
+    <!-- Zoom controls -->
+    <div class="custom-controls-map">
+      <button id="zoomIn">+</button>
+      <button id="zoomOut">−</button>
+      <input type="range" id="pitchSlider" min="0" max="85" value="60" class="pitch-slider">
+    </div>
+    
+    <!-- Pulsante hamburger (3 righe) -->
+    <button class="hamburger-button" id="hamburgerButton">
+      <div class="hamburger-line"></div>
+      <div class="hamburger-line"></div>
+      <div class="hamburger-line"></div>
+    </button>
   </div>
 
-  <div class="top-right-controls">
-    <button class="avatar-toggle" id="avatarToggle">👤 2D</button>
-    <button class="avatar-toggle" id="buildingsToggle">🏙️ 3D On</button>
-    <button class="home-button" id="goHome">🏠</button>
-    <div class="direction-indicator" id="directionIndicator">N 0°</div>
-  </div>
+  <!-- Overlay scuro -->
+  <div id="overlay"></div>
 
-  <div class="debug-info" id="debugInfo">Debug GPS: Caricamento…</div>
+  <!-- ═══════════════════════════════════════════════════════════
+       SIDEBAR (Menu laterale)
+       ═══════════════════════════════════════════════════════════ -->
+  <div id="sidebar">
+    <!-- Header con X -->
+    <div class="sidebar-header">
+      <button class="close-button" id="closeButton">×</button>
+      <h2>Menu</h2>
+      <p>Gestisci il tuo profilo</p>
+    </div>
 
-  <!-- 🆕 MODIFICA 6: Performance monitor -->
-  <div class="performance-indicator" id="performanceIndicator">
-    FPS: 60 | Mem: 0 MB
-  </div>
+    <!-- Sezione Profilo -->
+    <div class="profile-section">
+      <h3>
+        <div class="profile-icon">U</div>
+        Il Tuo Profilo
+      </h3>
+      <div class="profile-info">
+        <!-- Verrà popolato dinamicamente al login -->
+        <div class="profile-item">
+          <span>Username:</span>
+          <strong id="profileUsername">user</strong>
+        </div>
+        <div class="profile-item">
+          <span>Ruolo:</span>
+          <strong>Utente Standard</strong>
+        </div>
+        <div class="profile-item">
+          <span>Ultimo accesso:</span>
+          <strong id="lastLogin">--</strong>
+        </div>
+      </div>
+    </div>
 
-  <div class="custom-controls">
-    <button id="zoomIn">+</button>
-    <button id="zoomOut">−</button>
-    <input type="range" id="pitchSlider" min="0" max="85" value="60" class="pitch-slider">
+    <!-- Sezione Impostazioni -->
+    <div class="settings-section">
+      <h3>⚙️ Impostazioni</h3>
+      
+      <div class="setting-item" onclick="alert('Funzione Profilo in arrivo!')">
+        <div class="setting-icon">👤</div>
+        <div class="setting-content">
+          <h4>Modifica Profilo</h4>
+          <p>Cambia foto e informazioni</p>
+        </div>
+      </div>
+
+      <div class="setting-item" onclick="alert('Funzione Notifiche in arrivo!')">
+        <div class="setting-icon">🔔</div>
+        <div class="setting-content">
+          <h4>Notifiche</h4>
+          <p>Gestisci le tue notifiche</p>
+        </div>
+      </div>
+
+      <div class="setting-item" onclick="alert('Funzione Sicurezza in arrivo!')">
+        <div class="setting-icon">🔒</div>
+        <div class="setting-content">
+          <h4>Sicurezza</h4>
+          <p>Cambia password e privacy</p>
+        </div>
+      </div>
+
+      <div class="setting-item" onclick="alert('Funzione Tema in arrivo!')">
+        <div class="setting-icon">🎨</div>
+        <div class="setting-content">
+          <h4>Aspetto</h4>
+          <p>Tema e personalizzazione</p>
+        </div>
+      </div>
+
+      <div class="setting-item" onclick="alert('Funzione Aiuto in arrivo!')">
+        <div class="setting-icon">❓</div>
+        <div class="setting-content">
+          <h4>Aiuto</h4>
+          <p>FAQ e supporto</p>
+        </div>
+      </div>
+
+      <div class="setting-item" onclick="showStorageInfo()">
+        <div class="setting-icon">💾</div>
+        <div class="setting-content">
+          <h4>Storage</h4>
+          <p>Info account salvati</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pulsante Logout -->
+    <div class="logout-section">
+      <button class="logout-button" id="logoutButton">
+        🚪 Esci dall'account
+      </button>
+    </div>
   </div>
 
   <script>
-    const CONFIG = {
-      // Avatar
-      AVATAR_URL: 'https://models.readyplayer.me/688490fba5d9e1a75b930b7a.glb',
-      AVATAR_FALLBACK_URL: 'https://models.readyplayer.me/688490fba5d9e1a75b930b7a.glb',
-      AVATAR_SCALE: 5,
-      AVATAR_HEIGHT: 1.8,
+    // ═══════════════════════════════════════════════════════════
+    // 🆕 SISTEMA MULTI-ACCOUNT CON LOCALSTORAGE PERSISTENTE
+    // ═══════════════════════════════════════════════════════════
+    
+    // Chiave per localStorage
+    const STORAGE_KEY = 'app_accounts_database';
+
+    // Carica account da localStorage o usa default
+    function loadAccountsFromStorage() {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        try {
+          const accounts = JSON.parse(stored);
+          console.log('📦 Caricati', accounts.length, 'account da localStorage');
+          return accounts;
+        } catch (e) {
+          console.error('❌ Errore nel parsing degli account:', e);
+          return getDefaultAccounts();
+        }
+      } else {
+        console.log('🆕 Nessun account salvato, uso account default');
+        return getDefaultAccounts();
+      }
+    }
+
+    // Account predefiniti (solo la prima volta)
+    function getDefaultAccounts() {
+      return [
+        {
+          id: 1,
+          username: 'user',
+          password: 'user123',
+          nome: 'Mario Rossi',
+          email: 'mario.rossi@example.com',
+          ruolo: 'Utente Standard',
+          avatar: 'M',
+          colore: '#667eea',
+          dataRegistrazione: '2024-01-15'
+        },
+        {
+          id: 2,
+          username: 'admin',
+          password: 'admin123',
+          nome: 'Admin Sistema',
+          email: 'admin@example.com',
+          ruolo: 'Amministratore',
+          avatar: 'A',
+          colore: '#e74c3c',
+          dataRegistrazione: '2023-12-01'
+        }
+      ];
+    }
+
+    // Salva account in localStorage
+    function saveAccountsToStorage() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(ACCOUNTS_DATABASE));
+        console.log('💾 Account salvati in localStorage');
+        return true;
+      } catch (e) {
+        console.error('❌ Errore nel salvataggio:', e);
+        if (e.name === 'QuotaExceededError') {
+          alert('⚠️ Memoria browser piena! Impossibile salvare.');
+        }
+        return false;
+      }
+    }
+
+    // Database account (carica da localStorage)
+    let ACCOUNTS_DATABASE = loadAccountsFromStorage();
+
+    // Salva automaticamente ogni volta che il database cambia
+    function updateDatabase() {
+      saveAccountsToStorage();
+    }
+
+    // Account corrente loggato
+    let currentUser = null;
+
+    // Funzione per trovare account
+    function findAccount(username, password) {
+      return ACCOUNTS_DATABASE.find(
+        account => account.username === username && account.password === password
+      );
+    }
+
+    // Funzione per aggiungere nuovo account
+    function addAccount(accountData) {
+      const newAccount = {
+        id: ACCOUNTS_DATABASE.length + 1,
+        username: accountData.username,
+        password: accountData.password,
+        nome: accountData.nome || 'Nuovo Utente',
+        email: accountData.email || '',
+        ruolo: accountData.ruolo || 'Utente Standard',
+        avatar: accountData.username.charAt(0).toUpperCase(),
+        colore: accountData.colore || '#667eea',
+        dataRegistrazione: new Date().toISOString().split('T')[0]
+      };
       
-      // GPS
-      GPS_ACCURACY_THRESHOLD: 100, // metri
-      GPS_MIN_MOVEMENT: 1, // metri
-      GPS_UPDATE_DISTANCE: 50, // metri per aggiornare mappa
-      EMA_ALPHA: 0.25, // smoothing
-      
-      // Performance
-      TARGET_FPS: 60,
-      ANIMATION_UPDATE_RATE: 1/60,
-      IDLE_TIMEOUT: 1600, // ms
-      
-      // UI
-      STATUS_AUTO_HIDE_DELAY: 2000, // ms
-      TRANSITION_DURATION: 1600, // ms
-      
-      // Fallback location (Milano)
-      DEFAULT_HOME: [0, 0]
+      ACCOUNTS_DATABASE.push(newAccount);
+      updateDatabase(); // 🆕 Salva in localStorage
+      console.log('✅ Account aggiunto e salvato:', newAccount.username);
+      return newAccount;
+    }
+
+    // Funzione helper per vedere tutti gli account (solo console)
+    window.showAccounts = function() {
+      console.table(ACCOUNTS_DATABASE.map(acc => ({
+        Username: acc.username,
+        Password: acc.password,
+        Nome: acc.nome,
+        Ruolo: acc.ruolo,
+        Email: acc.email
+      })));
     };
 
-    mapboxgl.accessToken = 'pk.eyJ1IjoibWVldGdvLWJ1aWxkMDAiLCJhIjoiY21jcTFzdXV2MGQ0MzJscXc0MHc0Y2Q0ZSJ9.hFWnqVLwck_EoyBZGoxdxA';
+    // Funzione helper per aggiungere account dalla console
+    window.createAccount = function(username, password, nome, email, ruolo) {
+      if (!username || !password) {
+        console.error('❌ Username e password sono obbligatori');
+        return;
+      }
+      
+      // Verifica se username esiste già
+      if (ACCOUNTS_DATABASE.find(acc => acc.username === username)) {
+        console.error('❌ Username già esistente');
+        return;
+      }
+      
+      const newAccount = addAccount({
+        username,
+        password,
+        nome: nome || username,
+        email: email || `${username}@example.com`,
+        ruolo: ruolo || 'Utente Standard'
+      });
+      
+      console.log('✅ Account creato con successo!');
+      console.log('📋 Dettagli:', newAccount);
+      return newAccount;
+    };
 
-    class PerformanceMonitor {
-      constructor() {
-        this.frames = [];
-        this.lastTime = performance.now();
-        this.enabled = false;
+    // Funzione per cancellare tutti gli account (ATTENZIONE!)
+    window.resetAccounts = function() {
+      if (confirm('⚠️ ATTENZIONE: Vuoi eliminare TUTTI gli account e tornare ai default?')) {
+        ACCOUNTS_DATABASE = getDefaultAccounts();
+        updateDatabase();
+        console.log('🔄 Database resettato agli account default');
+        alert('✅ Database resettato! Ricarica la pagina.');
+      }
+    };
+
+    // Funzione per esportare database (backup)
+    window.exportAccounts = function() {
+      const dataStr = JSON.stringify(ACCOUNTS_DATABASE, null, 2);
+      const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+      const exportFileDefaultName = `accounts_backup_${new Date().toISOString().split('T')[0]}.json`;
+      
+      const linkElement = document.createElement('a');
+      linkElement.setAttribute('href', dataUri);
+      linkElement.setAttribute('download', exportFileDefaultName);
+      linkElement.click();
+      
+      console.log('💾 Database esportato come JSON');
+    };
+
+    // Funzione per vedere info storage
+    window.storageInfo = function() {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      const size = stored ? (new Blob([stored]).size / 1024).toFixed(2) : 0;
+      const maxSize = 5120; // ~5MB limit
+      const used = ((size / maxSize) * 100).toFixed(2);
+      
+      console.group('💾 Info LocalStorage');
+      console.log('Accounts salvati:', ACCOUNTS_DATABASE.length);
+      console.log('Dimensione:', size, 'KB');
+      console.log('Spazio usato:', used, '%');
+      console.log('Limite browser:', maxSize, 'KB (~5MB)');
+      console.groupEnd();
+    };
+
+    // 🆕 Funzione per mostrare info storage con alert
+    function showStorageInfo() {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      const size = stored ? (new Blob([stored]).size / 1024).toFixed(2) : 0;
+      const accountsCount = ACCOUNTS_DATABASE.length;
+      
+      const message = `💾 Info Archiviazione\n\n` +
+                     `✅ Account salvati: ${accountsCount}\n` +
+                     `📊 Dimensione: ${size} KB\n` +
+                     `🔒 Salvati permanentemente nel browser\n\n` +
+                     `📝 Gli account rimangono anche dopo la chiusura del browser!`;
+      
+      alert(message);
+      console.log('💾 Storage info mostrate');
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // ELEMENTI DOM
+    // ═══════════════════════════════════════════════════════════
+    const loginScreen = document.getElementById('loginScreen');
+    const mainScreen = document.getElementById('mainScreen');
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    const errorMessage = document.getElementById('errorMessage');
+    const registerError = document.getElementById('registerError');
+    const hamburgerButton = document.getElementById('hamburgerButton');
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('overlay');
+    const closeButton = document.getElementById('closeButton');
+    const logoutButton = document.getElementById('logoutButton');
+    const profileUsername = document.getElementById('profileUsername');
+    const toggleLink = document.getElementById('toggleLink');
+    const toggleText = document.getElementById('toggleText');
+    const loginSubtitle = document.getElementById('loginSubtitle');
+
+    // Elementi registrazione
+    let selectedColor = null;
+    const colorOptions = document.querySelectorAll('.color-option');
+    const previewIcon = document.getElementById('previewIcon');
+    const avatarPreview = document.getElementById('avatarPreview');
+
+    // TOGGLE TRA LOGIN E REGISTRAZIONE
+    let isLoginMode = true;
+
+    toggleLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      isLoginMode = !isLoginMode;
+
+      if (isLoginMode) {
+        // Mostra form login
+        loginForm.style.display = 'block';
+        registerForm.style.display = 'none';
+        loginSubtitle.textContent = 'Accedi per continuare';
+        toggleText.innerHTML = 'Non hai un account? <a href="#" id="toggleLink">Registrati</a>';
+        errorMessage.classList.remove('show');
+        registerError.classList.remove('show');
+      } else {
+        // Mostra form registrazione
+        loginForm.style.display = 'none';
+        registerForm.style.display = 'block';
+        loginSubtitle.textContent = 'Crea il tuo account';
+        toggleText.innerHTML = 'Hai già un account? <a href="#" id="toggleLink">Accedi</a>';
+        errorMessage.classList.remove('show');
+        registerError.classList.remove('show');
       }
 
-      update() {
-        if (!this.enabled) return;
+      // Ri-attacca evento al nuovo link
+      document.getElementById('toggleLink').addEventListener('click', arguments.callee);
+    });
+
+    // GESTIONE SELEZIONE COLORE
+    colorOptions.forEach(option => {
+      option.addEventListener('click', function() {
+        // Rimuovi selezione precedente
+        colorOptions.forEach(opt => opt.classList.remove('selected'));
         
-        const now = performance.now();
-        const delta = now - this.lastTime;
-        this.lastTime = now;
+        // Aggiungi selezione corrente
+        this.classList.add('selected');
+        selectedColor = this.getAttribute('data-color');
+        document.getElementById('selectedColor').value = selectedColor;
         
-        this.frames.push(delta);
-        if (this.frames.length > 60) this.frames.shift();
+        // Aggiorna preview
+        document.querySelector('.preview-icon').style.background = selectedColor;
         
-        const avgDelta = this.frames.reduce((a, b) => a + b, 0) / this.frames.length;
-        const fps = Math.round(1000 / avgDelta);
-        
-        // Memoria (se disponibile)
-        const mem = performance.memory ? 
-          (performance.memory.usedJSHeapSize / 1048576).toFixed(1) : 'N/A';
-        
-        const indicator = document.getElementById('performanceIndicator');
-        indicator.textContent = `FPS: ${fps} | Mem: ${mem} MB`;
-        
-        // Warning se FPS basso
-        if (fps < 30) {
-          console.warn('⚠️ FPS basso:', fps);
+        console.log('🎨 Colore selezionato:', selectedColor);
+      });
+    });
+
+    // AGGIORNA PREVIEW AVATAR QUANDO SCRIVI USERNAME
+    document.getElementById('regUsername').addEventListener('input', function(e) {
+      const username = e.target.value;
+      if (username.length > 0) {
+        previewIcon.textContent = username.charAt(0).toUpperCase();
+      } else {
+        previewIcon.textContent = '?';
+      }
+    });
+
+    // ═══════════════════════════════════════════════════════════
+    // GESTIONE REGISTRAZIONE
+    // ═══════════════════════════════════════════════════════════
+    registerForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      
+      // Raccogli dati dal form
+      const nome = document.getElementById('regNome').value.trim();
+      const cognome = document.getElementById('regCognome').value.trim();
+      const dataNascita = document.getElementById('regDataNascita').value;
+      const sesso = document.getElementById('regSesso').value;
+      const email = document.getElementById('regEmail').value.trim();
+      const username = document.getElementById('regUsername').value.trim();
+      const password = document.getElementById('regPassword').value;
+      const passwordConfirm = document.getElementById('regPasswordConfirm').value;
+      const colore = document.getElementById('selectedColor').value;
+
+      // VALIDAZIONI
+      
+      // 1. Verifica che il colore sia stato selezionato
+      if (!colore) {
+        registerError.textContent = '❌ Seleziona un colore per l\'avatar';
+        registerError.classList.add('show');
+        setTimeout(() => registerError.classList.remove('show'), 3000);
+        return;
+      }
+
+      // 2. Verifica che le password coincidano
+      if (password !== passwordConfirm) {
+        registerError.textContent = '❌ Le password non coincidono';
+        registerError.classList.add('show');
+        setTimeout(() => registerError.classList.remove('show'), 3000);
+        return;
+      }
+
+      // 3. Verifica che username non esista già
+      if (ACCOUNTS_DATABASE.find(acc => acc.username === username)) {
+        registerError.textContent = '❌ Username già esistente';
+        registerError.classList.add('show');
+        setTimeout(() => registerError.classList.remove('show'), 3000);
+        return;
+      }
+
+      // 4. Verifica che email non esista già
+      if (ACCOUNTS_DATABASE.find(acc => acc.email === email)) {
+        registerError.textContent = '❌ Email già registrata';
+        registerError.classList.add('show');
+        setTimeout(() => registerError.classList.remove('show'), 3000);
+        return;
+      }
+
+      // 5. Verifica età minima (13 anni)
+      const birthDate = new Date(dataNascita);
+      const today = new Date();
+      const age = today.getFullYear() - birthDate.getFullYear();
+      if (age < 13) {
+        registerError.textContent = '❌ Devi avere almeno 13 anni';
+        registerError.classList.add('show');
+        setTimeout(() => registerError.classList.remove('show'), 3000);
+        return;
+      }
+
+      // CREA NUOVO ACCOUNT
+      const newAccount = {
+        id: ACCOUNTS_DATABASE.length + 1,
+        username: username,
+        password: password,
+        nome: `${nome} ${cognome}`,
+        email: email,
+        ruolo: 'Utente Standard',
+        avatar: username.charAt(0).toUpperCase(),
+        colore: colore,
+        dataRegistrazione: new Date().toISOString().split('T')[0],
+        // 🆕 Dati aggiuntivi
+        dataNascita: dataNascita,
+        sesso: sesso,
+        nomeCompleto: {
+          nome: nome,
+          cognome: cognome
         }
-      }
+      };
 
-      toggle() {
-        this.enabled = !this.enabled;
-        document.getElementById('performanceIndicator').classList.toggle('show', this.enabled);
-      }
-    }
+      // Aggiungi al database
+      ACCOUNTS_DATABASE.push(newAccount);
+      updateDatabase(); // 🆕 SALVA PERMANENTEMENTE
 
-    const perfMonitor = new PerformanceMonitor();
+      console.log('✅ Nuovo account creato e salvato:', newAccount.username);
+      console.log('📋 Dettagli:', newAccount);
+      console.log('💾 Salvato in localStorage permanentemente');
 
-    class ResourceManager {
-      constructor() {
-        this.resources = new Set();
-      }
+      // SUCCESSO - Mostra messaggio e passa a login
+      registerError.style.background = '#4CAF50';
+      registerError.style.color = 'white';
+      registerError.textContent = '✅ Account creato con successo! Accedi ora';
+      registerError.classList.add('show');
 
-      track(resource, disposeMethod = 'dispose') {
-        this.resources.add({ resource, disposeMethod });
-      }
+      // Reset form
+      registerForm.reset();
+      selectedColor = null;
+      colorOptions.forEach(opt => opt.classList.remove('selected'));
+      previewIcon.style.background = '#ccc';
+      previewIcon.textContent = '?';
 
-      cleanup() {
-        console.log('🧹 Pulizia risorse:', this.resources.size);
-        this.resources.forEach(({ resource, disposeMethod }) => {
-          try {
-            if (resource && typeof resource[disposeMethod] === 'function') {
-              resource[disposeMethod]();
-            }
-          } catch (e) {
-            console.warn('Errore cleanup:', e);
-          }
-        });
-        this.resources.clear();
-      }
-    }
+      // Torna a login dopo 2 secondi
+      setTimeout(() => {
+        registerError.classList.remove('show');
+        registerError.style.background = '#e74c3c';
+        registerError.style.color = 'white';
+        
+        // Switch a login
+        isLoginMode = true;
+        loginForm.style.display = 'block';
+        registerForm.style.display = 'none';
+        loginSubtitle.textContent = 'Accedi per continuare';
+        toggleText.innerHTML = 'Non hai un account? <a href="#" id="toggleLink">Registrati</a>';
+        
+        // Pre-compila username
+        document.getElementById('username').value = username;
+        document.getElementById('password').focus();
+        
+        // Ri-attacca evento
+        document.getElementById('toggleLink').addEventListener('click', arguments.callee);
+      }, 2000);
+    });
+    loginForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
 
-    const resourceManager = new ResourceManager();
+      // Cerca account nel database
+      const account = findAccount(username, password);
 
-    // Cleanup automatico prima di chiudere
-    window.addEventListener('beforeunload', () => {
-      resourceManager.cleanup();
-      if (window.__gpsWatchId) {
-        navigator.geolocation.clearWatch(window.__gpsWatchId);
+      if (account) {
+        console.log('✅ Login effettuato con successo');
+        console.log('👤 Account:', account.nome, `(${account.ruolo})`);
+        
+        // Salva account corrente
+        currentUser = account;
+        
+        // Aggiorna profilo con dati account
+        profileUsername.textContent = account.username;
+        document.querySelector('.profile-icon').textContent = account.avatar;
+        document.querySelector('.profile-icon').style.background = account.colore;
+        
+        // Aggiorna info profilo
+        const profileInfo = document.querySelector('.profile-info');
+        profileInfo.innerHTML = `
+          <div class="profile-item">
+            <span>Username:</span>
+            <strong>${account.username}</strong>
+          </div>
+          <div class="profile-item">
+            <span>Nome:</span>
+            <strong>${account.nome}</strong>
+          </div>
+          <div class="profile-item">
+            <span>Email:</span>
+            <strong>${account.email}</strong>
+          </div>
+          <div class="profile-item">
+            <span>Ruolo:</span>
+            <strong>${account.ruolo}</strong>
+          </div>
+          <div class="profile-item">
+            <span>Registrato:</span>
+            <strong>${new Date(account.dataRegistrazione).toLocaleDateString('it-IT')}</strong>
+          </div>
+          <div class="profile-item">
+            <span>Ultimo accesso:</span>
+            <strong id="lastLogin">${new Date().toLocaleString('it-IT')}</strong>
+          </div>
+        `;
+        
+        // Nascondi schermata login
+        loginScreen.classList.add('hidden');
+        
+        // Mostra schermata principale dopo animazione
+        setTimeout(() => {
+          loginScreen.style.display = 'none';
+          mainScreen.classList.add('active');
+          
+          // 🆕 INIZIALIZZA MAPPA DOPO LOGIN
+          console.log('🗺️ Avvio inizializzazione mappa...');
+          setTimeout(() => {
+            initializeMap();
+          }, 100);
+        }, 500);
+        
+      } else {
+        console.log('❌ Credenziali errate');
+        
+        // Mostra errore
+        errorMessage.classList.add('show');
+        
+        // Nascondi errore dopo 3 secondi
+        setTimeout(() => {
+          errorMessage.classList.remove('show');
+        }, 3000);
+        
+        // Resetta form
+        document.getElementById('password').value = '';
       }
     });
 
-    // DEBUG BASE
-    console.log('=== DEBUG GPS INFO ===');
-    console.log('GPS disponibile:', !!navigator.geolocation);
-    console.log('HTTPS:', location.protocol === 'https:');
-    console.log('User Agent:', navigator.userAgent);
-
-    const statusIndicator = document.getElementById('statusIndicator');
-    const debugDiv = document.getElementById('debugInfo');
-    const avatarToggle = document.getElementById('avatarToggle');
-    const visibilityToggle = document.getElementById('visibilityToggle');
-    const buildingsToggle = document.getElementById('buildingsToggle');
-    const loadingOverlay = document.getElementById('loadingOverlay');
-    const loadingText = document.getElementById('loadingText');
-    const loadingProgress = document.getElementById('loadingProgress');
-
-    const map = new mapboxgl.Map({
-      container: 'map',
-      style: 'mapbox://styles/mapbox/streets-v12',
-      zoom: 18, 
-      pitch: 60, 
-      bearing: 0, 
-      center: CONFIG.DEFAULT_HOME, 
-      antialias: true,
-      // 🆕 Performance optimizations
-      maxTileCacheSize: 50, // ridotto da default
-      preserveDrawingBuffer: false,
-      refreshExpiredTiles: false
+    // ═══════════════════════════════════════════════════════════
+    // GESTIONE SIDEBAR (Menu laterale)
+    // ═══════════════════════════════════════════════════════════
+    
+    // Apri sidebar quando clicchi hamburger
+    hamburgerButton.addEventListener('click', () => {
+      sidebar.classList.add('open');
+      overlay.classList.add('active');
+      console.log('📂 Sidebar aperta');
     });
 
-    // Controlli zoom custom
-    document.getElementById('zoomIn').onclick = () => map.zoomIn();
-    document.getElementById('zoomOut').onclick = () => map.zoomOut();
-    document.getElementById('pitchSlider').addEventListener('input', (e) => map.setPitch(parseInt(e.target.value,10)));
+    // Chiudi sidebar con X
+    closeButton.addEventListener('click', closeSidebar);
 
-    // NavigationControl (solo bussola)
-    const navControl = new mapboxgl.NavigationControl({
-                        showCompass: true,
-                        showZoom: false
-                        });
+    // Chiudi sidebar cliccando overlay
+    overlay.addEventListener('click', closeSidebar);
 
-    // Aggiungi il controllo alla mappa
-    map.addControl(navControl, 'bottom-right');
-    /*map.addControl(new mapboxgl.NavigationControl({ showCompass: true, showZoom: false }), 'bottom-right');*/
+    function closeSidebar() {
+      sidebar.classList.remove('open');
+      overlay.classList.remove('active');
+      console.log('📁 Sidebar chiusa');
+    }
 
-    let tb, avatarModel, mixer, currentAnimation = null;
+    // Chiudi sidebar con tasto ESC
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && sidebar.classList.contains('open')) {
+        closeSidebar();
+      }
+    });
+
+    // ═══════════════════════════════════════════════════════════
+    // GESTIONE LOGOUT CON RESET ACCOUNT
+    // ═══════════════════════════════════════════════════════════
+    logoutButton.addEventListener('click', () => {
+      if (confirm('Sei sicuro di voler uscire?')) {
+        console.log('🚪 Logout effettuato');
+        console.log('👋 Arrivederci', currentUser ? currentUser.nome : '');
+        
+        // Chiudi sidebar
+        closeSidebar();
+        
+        // PULISCI MAPPA
+        if (map) {
+          console.log('🧹 Pulizia mappa...');
+          if (avatarMarker) avatarMarker.remove();
+          map.remove();
+          map = null;
+          avatarMarker = null;
+          gpsTrackingActive = false;
+        }
+        
+        // RESET ACCOUNT CORRENTE
+        currentUser = null;
+        
+        // Nascondi schermata principale
+        mainScreen.classList.remove('active');
+        
+        // Mostra schermata login
+        setTimeout(() => {
+          loginScreen.style.display = 'flex';
+          loginScreen.classList.remove('hidden');
+        }, 300);
+        
+        // Resetta form
+        loginForm.reset();
+        errorMessage.classList.remove('show');
+      }
+    });
+
+    // ═══════════════════════════════════════════════════════════
+    // RILEVAMENTO DISPOSITIVO E LOG DIMENSIONI
+    // ═══════════════════════════════════════════════════════════
+    function detectDevice() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      const isLandscape = width > height;
+      
+      let deviceType = '';
+      if (width >= 1441) deviceType = '🖥️ Large Desktop';
+      else if (width >= 1025) deviceType = '💻 Desktop';
+      else if (width >= 768) deviceType = '📱 Tablet';
+      else if (width >= 481) deviceType = '📱 Mobile Landscape';
+      else if (width >= 361) deviceType = '📱 Mobile';
+      else deviceType = '📱 Mobile Small';
+      
+      console.group('📐 Info Dispositivo');
+      console.log('Tipo:', deviceType);
+      console.log('Schermo:', `${width}x${height}px`);
+      console.log('Touch:', isTouchDevice ? 'Sì' : 'No');
+      console.log('Orientamento:', isLandscape ? 'Landscape' : 'Portrait');
+      console.log('DPR:', window.devicePixelRatio);
+      console.groupEnd();
+      
+      // Aggiorna classe body per debug
+      document.body.setAttribute('data-device', deviceType);
+      document.body.setAttribute('data-width', width);
+    }
+
+    // Esegui al caricamento
+    detectDevice();
+
+    // Esegui quando ridimensioni
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        detectDevice();
+        console.log('🔄 Finestra ridimensionata');
+        if (map) map.resize(); // Ridimensiona mappa
+      }, 250);
+    });
+
+    // Esegui quando cambi orientamento
+    window.addEventListener('orientationchange', () => {
+      setTimeout(() => {
+        detectDevice();
+        console.log('🔄 Orientamento cambiato');
+        if (map) map.resize(); // Ridimensiona mappa
+      }, 100);
+    });
+
+    // ═══════════════════════════════════════════════════════════
+    // INIZIALIZZAZIONE MAPPA 3D
+    // ═══════════════════════════════════════════════════════════
+    let map, tb, avatarModel, mixer, currentAnimation = null;
     let use3DAvatar = false;
     let avatarVisible = true;
-
     let currentLocation = null;
     let previousLocation = null;
     let smoothedLocation = null;
     let avatarMarker;
     let gpsTrackingActive = false;
     let movementTimeout;
-    
-    window.__lastMoveSpeedKmh = 0;
-    
-    // Debounce per evitare troppe chiamate
-    function debounce(func, wait) {
-      let timeout;
-      return function executedFunction(...args) {
-        const later = () => {
-          clearTimeout(timeout);
-          func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-      };
-    }
 
-    // Throttle per limitare frequenza
-    function throttle(func, limit) {
-      let inThrottle;
-      return function(...args) {
-        if (!inThrottle) {
-          func.apply(this, args);
-          inThrottle = true;
-          setTimeout(() => inThrottle = false, limit);
+    const CONFIG = {
+      AVATAR_URL: 'https://models.readyplayer.me/688490fba5d9e1a75b930b7a.glb',
+      AVATAR_FALLBACK_URL: 'https://models.readyplayer.me/688490fba5d9e1a75b930b7a.glb',
+      AVATAR_SCALE: 5,
+      AVATAR_HEIGHT: 1.8,
+      GPS_ACCURACY_THRESHOLD: 100,
+      GPS_MIN_MOVEMENT: 1,
+      GPS_UPDATE_DISTANCE: 50,
+      EMA_ALPHA: 0.25,
+      TARGET_FPS: 60,
+      ANIMATION_UPDATE_RATE: 1/60,
+      IDLE_TIMEOUT: 1600,
+      STATUS_AUTO_HIDE_DELAY: 2000,
+      TRANSITION_DURATION: 1600,
+      DEFAULT_HOME: [9.1900, 45.4642] // Milano
+    };
+
+    function initializeMap() {
+      console.log('🗺️ Inizializzazione mappa...');
+      
+      mapboxgl.accessToken = 'pk.eyJ1IjoibWVldGdvLWJ1aWxkMDAiLCJhIjoiY21jcTFzdXV2MGQ0MzJscXc0MHc0Y2Q0ZSJ9.hFWnqVLwck_EoyBZGoxdxA';
+
+      map = new mapboxgl.Map({
+        container: 'map',
+        style: 'mapbox://styles/mapbox/streets-v12',
+        zoom: 18,
+        pitch: 60,
+        bearing: 0,
+        center: CONFIG.DEFAULT_HOME,
+        antialias: true,
+        maxTileCacheSize: 50,
+        preserveDrawingBuffer: false,
+        refreshExpiredTiles: false
+      });
+
+      // Controlli zoom
+      document.getElementById('zoomIn').onclick = () => map.zoomIn();
+      document.getElementById('zoomOut').onclick = () => map.zoomOut();
+      document.getElementById('pitchSlider').addEventListener('input', (e) => {
+        map.setPitch(parseInt(e.target.value, 10));
+      });
+
+      // Navigation control
+      const navControl = new mapboxgl.NavigationControl({
+        showCompass: true,
+        showZoom: false
+      });
+      map.addControl(navControl, 'bottom-right');
+
+      // Edifici 3D
+      map.on('load', () => {
+        console.log('✅ Mappa caricata');
+        
+        const layers = map.getStyle().layers;
+        let labelLayerId;
+        for (const layer of layers) {
+          if (layer.type === 'symbol' && layer.layout && layer.layout['text-field']) {
+            labelLayerId = layer.id;
+            break;
+          }
         }
-      };
+
+        map.addLayer({
+          id: '3d-buildings',
+          source: 'composite',
+          'source-layer': 'building',
+          filter: ['==', 'extrude', 'true'],
+          type: 'fill-extrusion',
+          minzoom: 15,
+          paint: {
+            'fill-extrusion-color': ['interpolate', ['linear'], ['get', 'height'], 0, '#aaa', 50, '#999', 100, '#888'],
+            'fill-extrusion-height': ['get', 'height'],
+            'fill-extrusion-base': ['get', 'min_height'],
+            'fill-extrusion-opacity': 0.6
+          }
+        }, labelLayerId);
+
+        map.setLight({
+          anchor: 'map',
+          color: '#ffffff',
+          intensity: 0.5,
+          position: [1.15, 210, 30]
+        });
+
+        // Inizializza GPS
+        initializeGPS();
+      });
+
+      // Event listeners pulsanti
+      document.getElementById('goHome').addEventListener('click', () => {
+        const target = (gpsTrackingActive && smoothedLocation) ? smoothedLocation : CONFIG.DEFAULT_HOME;
+        const zoom = (gpsTrackingActive && smoothedLocation) ? 18 : 12;
+        const pitch = (gpsTrackingActive && smoothedLocation) ? 60 : 45;
+        
+        map.flyTo({ center: target, zoom, pitch, speed: 0.8, curve: 1.5 });
+        setStatusMap('Centrato su posizione');
+      });
+
+      document.getElementById('avatarToggle').addEventListener('click', toggleAvatar3D);
+      document.getElementById('buildingsToggle').addEventListener('click', toggleBuildings);
+      document.getElementById('gpsToggle').addEventListener('click', toggleGPS);
+      document.getElementById('visibilityToggle').addEventListener('click', toggleAvatarVisibility);
+
+      console.log('✅ Mappa inizializzata');
     }
 
-    // 🆕 Update debug con throttle (evita troppi aggiornamenti)
-    const updateDebugInfo = throttle((extra) => {
-      const info = [
-        `GPS: ${!!navigator.geolocation ? '✅' : '❌'}`,
-        `HTTPS: ${location.protocol === 'https:' ? '✅' : '❌'}`,
-        `Tracking: ${gpsTrackingActive ? '🟢 ON' : '🔴 OFF'}`,
-        `Avatar: ${avatarVisible ? 'Visibilità ON' : 'Visibilità OFF'}`,
-        smoothedLocation ? `Pos: ${smoothedLocation[0].toFixed(6)}, ${smoothedLocation[1].toFixed(6)}` : 'Pos: N/A',
-        `Device: ${/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ? '📱' : '💻'}`,
-        extra ? `Note: ${extra}` : ''
-      ].filter(Boolean);
-      debugDiv.textContent = info.join('\n');
-    }, 1000);
-
-    function showLoading(show, text = 'Caricamento...', progress = 0) {
-      if (show) {
-        loadingOverlay.classList.add('active');
-        loadingText.textContent = text;
-        loadingProgress.textContent = progress > 0 ? `${Math.round(progress)}%` : '';
-      } else {
-        loadingOverlay.classList.remove('active');
-      }
-    }
-
-    function updateLoadingProgress(progress, text) {
-      loadingProgress.textContent = `${Math.round(progress)}%`;
-      if (text) loadingText.textContent = text;
-    }
-
-    function setStatus(message, autoHide = true, duration = CONFIG.STATUS_AUTO_HIDE_DELAY) {
-      statusIndicator.style.display = 'block';
-      statusIndicator.style.opacity = '1';
-      statusIndicator.textContent = message;
+    function setStatusMap(message, autoHide = true, duration = 2000) {
+      const status = document.getElementById('statusIndicator');
+      status.style.display = 'block';
+      status.style.opacity = '1';
+      status.textContent = message;
       
       if (autoHide) {
         setTimeout(() => {
-          statusIndicator.style.opacity = '0';
-          setTimeout(() => {
-            statusIndicator.style.display = 'none';
-          }, 300);
+          status.style.opacity = '0';
+          setTimeout(() => status.style.display = 'none', 300);
         }, duration);
       }
     }
 
-    async function initializeLocation() {
-      showLoading(true, 'Rilevamento posizione GPS...', 10);
-      
-      // Check permessi
-      try {
-        const permissionResult = await navigator.permissions.query({ name: 'geolocation' });
-        console.log('Permesso geolocalizzazione:', permissionResult.state);
-        updateLoadingProgress(30, 'Verifica permessi...');
-      } catch (e) {
-        console.warn('Permissions API non disponibile:', e);
-      }
-
-      const onSuccess = (pos) => {
-        const lng = pos.coords.longitude;
-        const lat = pos.coords.latitude;
-        const accuracy = pos.coords.accuracy;
-        
-        console.log('✅ GPS ottenuto:', { lng, lat, accuracy });
-        updateLoadingProgress(60, 'Posizione trovata!');
-        
-        currentLocation = [lng, lat];
-        previousLocation = [lng, lat];
-        smoothedLocation = [lng, lat];
-        
-        updateLoadingProgress(80, 'Centraggio mappa...');
-        map.flyTo({ 
-          center: currentLocation, 
-          zoom: 18, 
-          pitch: 60, 
-          duration: CONFIG.TRANSITION_DURATION 
-        });
-        
-        updateLoadingProgress(90, 'Creazione avatar...');
-        createAvatarMarker();
-        resumeGPSTracking();
-        updateDirectionIndicator();
-        enableCompassHeading();
-        updateDebugInfo();
-        
-        updateLoadingProgress(100, 'Completato!');
-        setTimeout(() => showLoading(false), 500);
-        setStatus('Posizione GPS acquisita!');
-      };
-
-      const onError = (err) => {
-        console.warn('⚠️ Errore geolocalizzazione:', err.message, err.code);
-        
-        let errorMsg = 'Errore GPS';
-        switch(err.code) {
-          case 1: errorMsg = 'Permesso GPS negato'; break;
-          case 2: errorMsg = 'Posizione non disponibile'; break;
-          case 3: errorMsg = 'Timeout GPS'; break;
-        }
-        
-        updateLoadingProgress(50, `${errorMsg} - uso Milano`);
-        
-        currentLocation = CONFIG.DEFAULT_HOME;
-        previousLocation = [...CONFIG.DEFAULT_HOME];
-        smoothedLocation = [...CONFIG.DEFAULT_HOME];
-        
-        map.flyTo({ 
-          center: currentLocation, 
-          zoom: 18, 
-          pitch: 60, 
-          duration: 1200 
-        });
-        
-        createAvatarMarker();
-        resumeGPSTracking();
-        updateDirectionIndicator();
-        enableCompassHeading();
-        updateDebugInfo(`Fallback: ${errorMsg}`);
-        
-        setTimeout(() => showLoading(false), 1000);
-        setStatus(`${errorMsg} - Usando posizione di default`, true, 4000);
-      };
-
-      // Tentativo di ottenere posizione
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          onSuccess, 
-          onError, 
-          { 
-            enableHighAccuracy: true, 
-            timeout: 8000,
-            maximumAge: 5000 // accetta cache fino a 5s
-          }
-        );
-      } else {
-        onError(new Error('Geolocalizzazione non supportata'));
-      }
-    }
-
-    // Avvia inizializzazione
-    initializeLocation();
-
     function createAvatarMarker() {
-      // Rimuovi marker esistente
       if (avatarMarker) {
         avatarMarker.remove();
         avatarMarker = null;
@@ -701,865 +2461,144 @@
       console.log('✅ Marker 2D creato');
     }
 
-    function initializeThreebox() {
-      try {
-        tb = new Threebox(map, map.getCanvas().getContext('webgl'), { 
-          defaultLights: true,
-          realSunlight: true // 🆕 luce solare realistica
-        });
-
-        map.addLayer({
-          id: 'custom-threebox-model',
-          type: 'custom',
-          renderingMode: '3d',
-          onAdd: function() {
-            loadAvatar3D();
-          },
-          render: function(gl, matrix) {
-            // 🆕 Update performance monitor
-            perfMonitor.update();
-            
-            tb.update();
-            if (mixer) mixer.update(CONFIG.ANIMATION_UPDATE_RATE);
-          }
-        });
-      } catch (error) {
-        console.error('❌ Errore inizializzazione Threebox:', error);
-        setStatus('Errore caricamento 3D - uso marker 2D', true, 4000);
-        use3DAvatar = false;
-        createAvatarMarker();
-      }
-    }
-    
-    async function loadAvatar3D(isRetry = false) {
-      const avatarUrl = isRetry ? CONFIG.AVATAR_FALLBACK_URL : CONFIG.AVATAR_URL;
-      
-      showLoading(true, isRetry ? 'Caricamento avatar fallback...' : 'Caricamento avatar 3D...', 0);
-      
-      const avatarOptions = {
-        obj: avatarUrl,
-        type: 'gltf',
-        scale: { 
-          x: CONFIG.AVATAR_SCALE, 
-          y: CONFIG.AVATAR_SCALE, 
-          z: CONFIG.AVATAR_SCALE 
-        },
-        units: 'meters',
-        rotation: { x: 180, y: 90, z: 0 },
-        anchor: 'bottom-left'
-      };
-
-      tb.loadObj(avatarOptions, (model) => {
-        console.log('✅ Avatar 3D caricato:', avatarUrl);
-        avatarModel = model;
-        
-        updateLoadingProgress(50, 'Setup animazioni...');
-
-        // 🆕 MODIFICA 18: GESTIONE ANIMAZIONI MIGLIORATA
-        if (model.animations && model.animations.length) {
-          console.log(`📽️ ${model.animations.length} animazioni trovate`);
-          
-          mixer = new THREE.AnimationMixer(model);
-          
-          // Track per cleanup
-          resourceManager.track(mixer, 'stopAllAction');
-          
-          // Trova e avvia animazione idle
-          const idleNames = ['idle', 'breathing_idle', 'standing_idle', 'default'];
-          const animationMap = {};
-          
-          model.animations.forEach(clip => {
-            const name = clip.name.toLowerCase();
-            animationMap[name] = clip;
-            console.log(`  - ${clip.name}: ${clip.duration.toFixed(2)}s`);
-          });
-          
-          // Cerca idle animation
-          for (const name of idleNames) {
-            if (animationMap[name]) {
-              currentAnimation = mixer.clipAction(animationMap[name]);
-              currentAnimation.play();
-              console.log('▶️ Animazione idle avviata:', name);
-              break;
-            }
-          }
-          
-          // Fallback: usa prima animazione disponibile
-          if (!currentAnimation && model.animations.length > 0) {
-            currentAnimation = mixer.clipAction(model.animations[0]);
-            currentAnimation.play();
-            console.log('▶️ Animazione fallback avviata:', model.animations[0].name);
-          }
-        } else {
-          console.warn('⚠️ Nessuna animazione trovata nel modello');
-        }
-
-        updateLoadingProgress(75, 'Posizionamento avatar...');
-        
-        // 🆕 MODIFICA 19: POSIZIONAMENTO CON VALIDAZIONE
-        const coords = smoothedLocation || CONFIG.DEFAULT_HOME;
-        avatarModel.setCoords([coords[0], coords[1], CONFIG.AVATAR_HEIGHT]);
-        
-        if (!avatarVisible) {
-          avatarModel.visible = false;
-        }
-        
-        tb.add(avatarModel);
-        
-        // 🆕 Track per cleanup
-        resourceManager.track(avatarModel);
-
-        updateLoadingProgress(100, 'Avatar pronto!');
-        showLoading(false);
-        setStatus('Avatar 3D caricato con successo!');
-        
-        // 🆕 Log info modello
-        logModelInfo(model);
-        
-      }, (progress) => {
-        // 🆕 MODIFICA 20: PROGRESS CALLBACK
-        const percent = (progress.loaded / progress.total) * 100;
-        updateLoadingProgress(percent, 'Download avatar...');
-        console.log(`📥 Download: ${percent.toFixed(0)}%`);
-      }, (error) => {
-        // 🆕 MODIFICA 21: GESTIONE ERRORI CON RETRY
-        console.error('❌ Errore caricamento avatar:', error);
-        
-        if (!isRetry) {
-          console.log('🔄 Tentativo con avatar fallback...');
-          setTimeout(() => loadAvatar3D(true), 1000);
-        } else {
-          showLoading(false);
-          setStatus('Errore caricamento avatar - uso marker 2D', true, 4000);
-          use3DAvatar = false;
-          createAvatarMarker();
-          
-          avatarToggle.textContent = '👤 2D';
-          avatarToggle.style.background = 'white';
-          avatarToggle.style.color = 'black';
-        }
-      });
-    }
-
-    function logModelInfo(model) {
-      console.group('📊 Dettagli Modello 3D');
-      
-      if (model.scene) {
-        let vertCount = 0, faceCount = 0, meshCount = 0;
-        let textureCount = 0, textureMemory = 0;
-        
-        model.scene.traverse((child) => {
-          if (child.isMesh) {
-            meshCount++;
-            
-            if (child.geometry) {
-              if (child.geometry.attributes.position) {
-                vertCount += child.geometry.attributes.position.count;
-              }
-              if (child.geometry.index) {
-                faceCount += child.geometry.index.count / 3;
-              }
-            }
-            
-            if (child.material) {
-              const mat = Array.isArray(child.material) ? child.material : [child.material];
-              mat.forEach(m => {
-                if (m.map && m.map.image) {
-                  textureCount++;
-                  const img = m.map.image;
-                  const bytes = (img.width || 512) * (img.height || 512) * 4;
-                  textureMemory += bytes;
-                }
-              });
-            }
-          }
-        });
-        
-        console.log(`Meshes: ${meshCount}`);
-        console.log(`Vertici: ${vertCount.toLocaleString()}`);
-        console.log(`Facce: ${Math.round(faceCount).toLocaleString()}`);
-        console.log(`Texture: ${textureCount} (~${(textureMemory/1048576).toFixed(2)} MB)`);
-      }
-      
-      if (model.animations) {
-        console.log(`\nAnimazioni: ${model.animations.length}`);
-        model.animations.forEach((anim, i) => {
-          console.log(`  ${i + 1}. ${anim.name || 'Unnamed'} - ${anim.duration.toFixed(2)}s (${anim.tracks.length} tracks)`);
-        });
-      }
-      
-      console.groupEnd();
-    }
-
-    visibilityToggle.addEventListener('click', () => {
-      avatarVisible = !avatarVisible;
-      
-      if (avatarVisible) {
-        visibilityToggle.textContent = 'Visibilità ON';
-        visibilityToggle.classList.remove('hidden');
-        
-        if (use3DAvatar && avatarModel) {
-            avatarModel.setObjectScale(CONFIG.AVATAR_SCALE, CONFIG.AVATAR_SCALE, CONFIG.AVATAR_SCALE);
-          
-            // Prova anche traverse di THREE.js
-            if (avatarModel.scene) {
-                avatarModel.scene.traverse((child) => {
-                if (child.isMesh) {
-                    child.visible = true;
-                }
-                });
-            }
-
-          /* avatarModel.visible = true;*/
-        } else if (avatarMarker) {
-          avatarMarker.getElement().classList.remove('avatar-hidden');
-        }
-        
-        setStatus('Avatar visibile');
-      } else {
-        visibilityToggle.textContent = 'Visibilità OFF';
-        visibilityToggle.classList.add('hidden');
-        
-        if (use3DAvatar && avatarModel) {
-            avatarModel.setObjectScale(0.001, 0.001, 0.001);
-            if (avatarModel.scene) {
-                avatarModel.scene.traverse((child) => {
-                if (child.isMesh) {
-                    child.visible = false;
-                }
-                });
-            }
-        /*    if (avatarModel.scene) {                
-                avatarModel.scene.visible = false;
-                }
-                avatarModel.visible = false;
-        */
-        } else if (avatarMarker) {
-          avatarMarker.getElement().classList.add('avatar-hidden');
-        }
-        
-        setStatus('Avatar nascosto');
-      }
-      
-      updateDebugInfo();
-    });
-
-    avatarToggle.addEventListener('click', () => {
-      if (!use3DAvatar) {
-        // Passa a 3D
-        setStatus('Attivazione avatar 3D...', false);
-        
-        // Rimuovi marker 2D
-        if (avatarMarker) {
-          avatarMarker.remove();
-          avatarMarker = null;
-        }
-        
-        // Attiva layer 3D
-        if (map.getLayer('custom-threebox-model')) {
-          map.setLayoutProperty('custom-threebox-model', 'visibility', 'visible');
-          
-          if (avatarModel) {
-            const coords = smoothedLocation || CONFIG.DEFAULT_HOME;
-            avatarModel.setCoords([coords[0], coords[1], CONFIG.AVATAR_HEIGHT]);
-            avatarModel.visible = avatarVisible;
-          }
-          setStatus('Avatar 3D attivo!');
-        } else {
-          initializeThreebox();
-        }
-        
-        use3DAvatar = true;
-        avatarToggle.textContent = '👤 3D';
-        avatarToggle.style.background = '#4CAF50';
-        avatarToggle.style.color = '#fff';
-        
-      } else {
-        // Passa a 2D
-        if (map.getLayer('custom-threebox-model')) {
-          map.setLayoutProperty('custom-threebox-model', 'visibility', 'none');
-        }
-        
-        createAvatarMarker();
-        use3DAvatar = false;
-        
-        avatarToggle.textContent = '👤 2D';
-        avatarToggle.style.background = 'white';
-        avatarToggle.style.color = 'black';
-        
-        setStatus('Avatar 2D attivo');
-      }
-    });
-
-    let buildingsVisible = true;
-    buildingsToggle.addEventListener('click', () => {
-      buildingsVisible = !buildingsVisible;
-      
-      if (map.getLayer('3d-buildings')) {
-        map.setLayoutProperty('3d-buildings', 'visibility', buildingsVisible ? 'visible' : 'none');
-        buildingsToggle.textContent = buildingsVisible ? '🏙️ 3D On' : '🏙️ 3D Off';
-        setStatus(buildingsVisible ? 'Edifici 3D visibili' : 'Edifici 3D nascosti');
-      }
-    });
-
-    function geographicBearing(from, to) {
-      const [lon1, lat1] = from.map(v => v * Math.PI / 180);
-      const [lon2, lat2] = to.map(v => v * Math.PI / 180);
-      const dLon = lon2 - lon1;
-      const y = Math.sin(dLon) * Math.cos(lat2);
-      const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
-      let brng = Math.atan2(y, x) * 180 / Math.PI;
-      return (brng + 360) % 360;
-    }
-
-    function calculateDistance(a, b) {
-      if (!a || !b) return 0;
-      
-      const R = 6371e3; // Earth radius in meters
-      const [lon1, lat1] = a.map(v => v * Math.PI / 180);
-      const [lon2, lat2] = b.map(v => v * Math.PI / 180);
-      const dLat = lat2 - lat1;
-      const dLon = lon2 - lon1;
-      const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
-      return 2 * R * Math.asin(Math.sqrt(h));
-    }
-
-    function lerp(a, b, t) { 
-      return a + (b - a) * t; 
-    }
-
-    // 🆕 MODIFICA 27: SMOOTHING CON VALIDAZIONE
-    function smoothTo(target) {
-      if (!target || target.length !== 2) {
-        console.warn('⚠️ Target invalido per smoothing');
-        return;
-      }
-      
-      if (!smoothedLocation) {
-        smoothedLocation = [...target];
-        return;
-      }
-      
-      smoothedLocation = [
-        lerp(smoothedLocation[0], target[0], CONFIG.EMA_ALPHA),
-        lerp(smoothedLocation[1], target[1], CONFIG.EMA_ALPHA)
-      ];
-    }
-
-    const updateMovementUI = throttle((distance, bearing) => {
-      const dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
-      const idx = Math.round(bearing / 22.5) % 16;
-      const direction = dirs[idx];
-
-      const now = performance.now();
-      if (!window.__lastMoveTime) {
-        window.__lastMoveTime = now;
-        window.__lastMoveDist = 0;
-      }
-      
-      const dt = Math.max(0.1, (now - window.__lastMoveTime) / 1000);
-      const speed = distance / dt;
-      const kmh = speed * 3.6;
-
-      window.__lastMoveSpeedKmh = kmh;
-
-      const dirEl = document.getElementById('directionIndicator');
-      const isMobile = window.innerWidth <= 768;
-      
-      if (isMobile) {
-        dirEl.textContent = `${direction} ${Math.round(bearing)}°`;
-        map.removeControl(navControl);
-      } else {
-        dirEl.textContent = `${direction} ${Math.round(bearing)}° • ${kmh.toFixed(1)} km/h`;
-        map.addControl(navControl, 'bottom-right');
-      }
-      
-      window.__lastMoveTime = now;
-    }, 500); // Update ogni 500ms max
-
-    function startWalkingAnimation() {
-      if (!avatarModel || !mixer) return;
-      
-      const walkNames = ['walking', 'walk', 'run', 'running', 'locomotion'];
-      
-      for (const clip of (avatarModel.animations || [])) {
-        const n = clip.name.toLowerCase();
-        if (walkNames.some(s => n.includes(s))) {
-          if (currentAnimation) {
-            currentAnimation.fadeOut(0.25);
-          }
-          currentAnimation = mixer.clipAction(clip);
-          currentAnimation.reset().fadeIn(0.25).play();
-          console.log('🚶 Walking animation:', clip.name);
-          return;
-        }
-      }
-    }
-
-    function startIdleAnimation() {
-      if (!avatarModel || !mixer) return;
-      
-      const idleNames = ['idle', 'breathing_idle', 'standing_idle', 'default'];
-      
-      for (const clip of (avatarModel.animations || [])) {
-        const n = clip.name.toLowerCase();
-        if (idleNames.some(s => n.includes(s))) {
-          if (currentAnimation) {
-            currentAnimation.fadeOut(0.25);
-          }
-          currentAnimation = mixer.clipAction(clip);
-          currentAnimation.reset().fadeIn(0.25).play();
-          console.log('🧍 Idle animation:', clip.name);
-          return;
-        }
-      }
-      
-      // Fallback alla prima animazione
-      if ((avatarModel.animations || []).length) {
-        if (currentAnimation) {
-          currentAnimation.fadeOut(0.25);
-        }
-        currentAnimation = mixer.clipAction(avatarModel.animations[0]);
-        currentAnimation.reset().fadeIn(0.25).play();
-      }
-    }
-
-    function applyAvatarTransform(newLoc) {
-      if (!newLoc || newLoc.length !== 2) {
-        console.warn('⚠️ Posizione invalida per transform');
-        return;
-      }
-      
-      smoothTo(newLoc);
-      
-      const distance = calculateDistance(currentLocation, newLoc);
-      const bearing = geographicBearing(previousLocation || currentLocation, newLoc);
-
-      if (use3DAvatar && avatarModel) {
-        // Posizionamento
-        avatarModel.setCoords([
-          smoothedLocation[0], 
-          smoothedLocation[1], 
-          CONFIG.AVATAR_HEIGHT
-        ]);
-        
-        // ROTAZIONE CORRETTA (solo Y axis)
-        const yDeg = -(bearing - 90);
-        avatarModel.setRotation({ x: 90, y: yDeg, z: 0 });
-
-        // Animazione basata su movimento
-        if (mixer && distance > CONFIG.GPS_MIN_MOVEMENT) {
-          clearTimeout(movementTimeout);
-          startWalkingAnimation();
-          movementTimeout = setTimeout(() => {
-            startIdleAnimation();
-          }, CONFIG.IDLE_TIMEOUT);
-        }
-      } else if (avatarMarker) {
-        avatarMarker.setLngLat(smoothedLocation);
-      }
-
-      updateMovementUI(distance, bearing);
-      previousLocation = currentLocation;
-      currentLocation = newLoc;
-    }
-
-    function enableCompassHeading() {
-      let lastHeading = null;
-      const HEADING_THRESHOLD = 5; // gradi minimo cambiamento
-      
-      function onHeading(heading) {
-        if (use3DAvatar && avatarModel && typeof heading === 'number') {
-          // Applica solo se cambiamento significativo
-          if (lastHeading === null || Math.abs(heading - lastHeading) > HEADING_THRESHOLD) {
-            const yDeg = -(heading - 90);
-            avatarModel.setRotation({ x: 90, y: yDeg, z: 0 });
-            lastHeading = heading;
-          }
-        }
-      }
-
-      // iOS - richiede permesso
-      if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
-        avatarToggle.addEventListener('click', async () => {
-          try {
-            const res = await DeviceOrientationEvent.requestPermission();
-            if (res === 'granted') {
-              window.addEventListener('deviceorientation', (e) => {
-                const h = e.webkitCompassHeading ?? (360 - (e.alpha || 0));
-                onHeading(h);
-              });
-              console.log('✅ Bussola iOS attivata');
-            }
-          } catch (err) {
-            console.warn('⚠️ Permesso bussola negato:', err);
-          }
-        }, { once: true });
-      } 
-      // Android / altri dispositivi
-      else if (window.DeviceOrientationEvent) {
-        const eventType = 'deviceorientationabsolute' in window ? 
-          'deviceorientationabsolute' : 'deviceorientation';
-        
-        window.addEventListener(eventType, (e) => {
-          if (e.absolute && typeof e.alpha === 'number') {
-            const h = 360 - e.alpha;
-            onHeading(h);
-          }
-        });
-        console.log('✅ Bussola Android attivata');
-      }
-    }
-
-    function handleGPS(pos) {
-      const { longitude: lng, latitude: lat, accuracy, speed, heading } = pos.coords;
-      const newLoc = [lng, lat];
-      
-      // 🆕 Filtra fix imprecisi
-      if (accuracy && accuracy > CONFIG.GPS_ACCURACY_THRESHOLD) {
-        console.warn(`⚠️ GPS accuracy troppo bassa: ${accuracy.toFixed(0)}m`);
-        updateDebugInfo(`Acc. bassa: ${accuracy.toFixed(0)}m`);
-        return;
-      }
-
-      // GPS heading quando in movimento
-      if (typeof heading === 'number' && !Number.isNaN(heading) && speed && speed > 0.5) {
-        if (use3DAvatar && avatarModel) {
-          const yDeg = -(heading - 90);
-          avatarModel.setRotation({ x: 90, y: yDeg, z: 0 });
-        }
-      }
-
-      // Calcola distanza
-      const d = calculateDistance(smoothedLocation || currentLocation, newLoc);
-      
-      // Applica transform solo se movimento significativo
-      if (d > CONFIG.GPS_MIN_MOVEMENT) {
-        applyAvatarTransform(newLoc);
-        
-        // Aggiorna mappa se movimento grande
-        if (d > CONFIG.GPS_UPDATE_DISTANCE) {
-          map.easeTo({ center: newLoc, duration: 1000 });
-        }
-      }
-      
-      // Update debug
-      const speedKmh = speed ? (speed * 3.6).toFixed(1) : '0.0';
-      updateDebugInfo(`Vel: ${speedKmh} km/h | Acc: ${accuracy?.toFixed(0) || 'N/A'}m`);
-    }
-
-    const gpsToggleBtn = document.getElementById('gpsToggle');
-    gpsToggleBtn.addEventListener('click', () => {
-      if (gpsTrackingActive) {
-        stopGPSTracking();
-      } else {
-        resumeGPSTracking();
-      }
-    });
-
-    function stopGPSTracking() {
-      if (window.__gpsWatchId) {
-        navigator.geolocation.clearWatch(window.__gpsWatchId);
-        window.__gpsWatchId = null;
-      }
-      
-      gpsTrackingActive = false;
-      
-      setStatus('GPS tracking disattivato');
-      gpsToggleBtn.classList.remove('active');
-      gpsToggleBtn.textContent = '📍 GPS OFF';
-      updateDebugInfo('GPS OFF');
-    }
-
-    function resumeGPSTracking() {
+    function initializeGPS() {
       if (!navigator.geolocation) {
-        setStatus('GPS non supportato', true, 3000);
+        console.warn('GPS non supportato');
+        setStatusMap('GPS non supportato', true, 3000);
+        createAvatarMarker();
         return;
       }
 
-      gpsTrackingActive = true;
-      gpsToggleBtn.classList.add('active');
-      gpsToggleBtn.textContent = '📍 GPS ON';
-      setStatus('GPS tracking attivo');
-
-      // 🆕 Prima ottieni posizione corrente
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const lng = pos.coords.longitude;
           const lat = pos.coords.latitude;
           
-          if (!currentLocation) {
-            currentLocation = [lng, lat];
-            previousLocation = [lng, lat];
-            smoothedLocation = [lng, lat];
-            
-            map.flyTo({ 
-              center: currentLocation, 
-              zoom: 18, 
-              pitch: 60, 
-              duration: CONFIG.TRANSITION_DURATION 
-            });
-            
-            if (!avatarMarker && !avatarModel) {
-              createAvatarMarker();
-            }
-          }
+          console.log('✅ GPS ottenuto:', { lng, lat });
           
-          updateDebugInfo('GPS fix iniziale ottenuto');
+          currentLocation = [lng, lat];
+          previousLocation = [lng, lat];
+          smoothedLocation = [lng, lat];
+          
+          map.flyTo({ 
+            center: currentLocation, 
+            zoom: 18, 
+            pitch: 60, 
+            duration: 1600 
+          });
+          
+          createAvatarMarker();
+          setStatusMap('Posizione GPS acquisita!');
+          
+          // Avvia tracking
+          gpsTrackingActive = true;
         },
-        (err) => console.warn('⚠️ Errore getCurrentPosition:', err),
-        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-      );
-
-      // 🆕 Poi attiva tracking continuo
-      const opts = {
-        enableHighAccuracy: true,
-        maximumAge: 1000,
-        timeout: 8000
-      };
-
-      window.__gpsWatchId = navigator.geolocation.watchPosition(
-        handleGPS,
         (err) => {
-          console.error('❌ Errore GPS tracking:', err.message);
-          setStatus(`Errore GPS: ${err.message}`, true, 3000);
-          updateDebugInfo(`GPS Err: ${err.code}`);
+          console.warn('Errore GPS:', err);
+          setStatusMap('Usando posizione di default', true, 3000);
+          createAvatarMarker();
         },
-        opts
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 5000 }
       );
-      
-      console.log('✅ GPS tracking avviato');
     }
 
-    document.getElementById('goHome').addEventListener('click', () => {
-      const target = (gpsTrackingActive && smoothedLocation) ? 
-        smoothedLocation : CONFIG.DEFAULT_HOME;
+    function toggleGPS() {
+      gpsTrackingActive = !gpsTrackingActive;
+      const btn = document.getElementById('gpsToggle');
       
-      const zoom = (gpsTrackingActive && smoothedLocation) ? 18 : 12;
-      const pitch = (gpsTrackingActive && smoothedLocation) ? 60 : 45;
-      
-      map.flyTo({
-        center: target,
-        zoom: zoom,
-        pitch: pitch,
-        speed: 0.8,
-        curve: 1.5
-      });
-      
-      setStatus('Centrato su posizione');
-    });
-
-    const directionIndicator = document.getElementById('directionIndicator');
-    
-    const updateDirectionIndicator = throttle(() => {
-      const b = ((map.getBearing() % 360) + 360) % 360;
-      const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-      const idx = Math.round(b / 45) % 8;
-      const isMobile = window.innerWidth <= 768;
-      const kmh = window.__lastMoveSpeedKmh && !isMobile ? 
-        ` • ${window.__lastMoveSpeedKmh.toFixed(1)} km/h` : '';
-      directionIndicator.textContent = `${dirs[idx]} ${Math.round(b)}°${kmh}`;
-    }, 250);
-
-    map.on('rotate', updateDirectionIndicator);
-    window.addEventListener('resize', debounce(updateDirectionIndicator, 500));
-
-    map.on('load', () => {
-      console.log('🗺️ Mappa caricata');
-
-      const layers = map.getStyle().layers;
-      let labelLayerId;
-      for (const layer of layers) {
-        if (layer.type === 'symbol' && layer.layout && layer.layout['text-field']) {
-          labelLayerId = layer.id;
-          break;
-        }
-      }
-
-      // 🆕 Edifici 3D con configurazione ottimizzata
-      map.addLayer(
-        {
-          id: '3d-buildings',
-          source: 'composite',
-          'source-layer': 'building',
-          filter: ['==', 'extrude', 'true'],
-          type: 'fill-extrusion',
-          minzoom: 15,
-          paint: {
-            'fill-extrusion-color': [
-              'interpolate',
-              ['linear'],
-              ['get', 'height'],
-              0, '#aaa',
-              50, '#999',
-              100, '#888'
-            ],
-            'fill-extrusion-height': ['get', 'height'],
-            'fill-extrusion-base': ['get', 'min_height'],
-            'fill-extrusion-opacity': 0.6
-          }
-        },
-        labelLayerId
-      );
-
-      // 🆕 Luce ottimizzata
-      map.setLight({
-        anchor: 'map',
-        color: '#ffffff',
-        intensity: 0.5,
-        position: [1.15, 210, 30]
-      });
-
-      console.log('✅ Edifici 3D configurati');
-    });
-
-    document.addEventListener('keydown', (e) => {
-      switch(e.key.toLowerCase()) {
-        case 'p': // Performance monitor
-          perfMonitor.toggle();
-          break;
-        case 'h': // Home
-          document.getElementById('goHome').click();
-          break;
-        case 'g': // GPS toggle
-          gpsToggleBtn.click();
-          break;
-        case 'v': // Visibility toggle
-          visibilityToggle.click();
-          break;
-        case 'a': // Avatar 2D/3D
-          avatarToggle.click();
-          break;
-        case 'b': // Buildings
-          buildingsToggle.click();
-          break;
-      }
-    });
-
-    console.log('⌨️ Shortcuts: P=Perf, H=Home, G=GPS, V=Visibility, A=Avatar, B=Buildings');
-
-    setInterval(() => {
       if (gpsTrackingActive) {
-        updateDebugInfo();
-      }
-    }, 5000);
-
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) {
-        console.log('⏸️ Tab nascosta - pausa animazioni');
-        // Pausa animazioni per risparmiare batteria
-        if (mixer) {
-          mixer.timeScale = 0;
-        }
-        // Riduce aggiornamenti GPS
-        if (gpsTrackingActive && window.__gpsWatchId) {
-          // Non stoppiamo GPS ma riduciamo priority
-          console.log('🔋 Modalità risparmio energetico attiva');
-        }
+        btn.classList.add('active');
+        btn.textContent = '📍 GPS ON';
+        setStatusMap('GPS tracking attivo');
       } else {
-        console.log('▶️ Tab visibile - riprendi animazioni');
-        // Riprendi animazioni
-        if (mixer) {
-          mixer.timeScale = 1;
-        }
+        btn.classList.remove('active');
+        btn.textContent = '📍 GPS OFF';
+        setStatusMap('GPS tracking disattivato');
       }
-    });
-
-    window.addEventListener('error', (event) => {
-      console.error('❌ Errore globale:', event.error);
-      
-      // Recovery automatico per errori comuni
-      if (event.error && event.error.message) {
-        const msg = event.error.message.toLowerCase();
-        
-        // WebGL context loss
-        if (msg.includes('webgl') || msg.includes('context')) {
-          setStatus('Errore grafico - ricarica pagina', false);
-          console.error('💥 WebGL context perso - serve reload');
-        }
-        
-        // Out of memory
-        if (msg.includes('memory')) {
-          console.error('💾 Memoria insufficiente');
-          setStatus('Memoria insufficiente - libero risorse', true, 4000);
-          resourceManager.cleanup();
-        }
-      }
-    });
-
-    // WebGL context lost handler
-    const canvas = map.getCanvas();
-    canvas.addEventListener('webglcontextlost', (event) => {
-      event.preventDefault();
-      console.error('💥 WebGL context perso!');
-      setStatus('Errore grafico - ricaricare la pagina', false);
-    }, false);
-
-    canvas.addEventListener('webglcontextrestored', () => {
-      console.log('✅ WebGL context ripristinato');
-      setStatus('Grafica ripristinata', true, 2000);
-    }, false);
-
-    window.addEventListener('online', () => {
-      console.log('🌐 Connessione ripristinata');
-      setStatus('Connessione ristabilita', true, 2000);
-      
-      // Riprendi GPS se era attivo
-      if (gpsTrackingActive && !window.__gpsWatchId) {
-        resumeGPSTracking();
-      }
-    });
-
-    window.addEventListener('offline', () => {
-      console.log('📡 Connessione persa');
-      setStatus('Modalità offline - mappe in cache', true, 4000);
-    });
-
-    window.addEventListener('orientationchange', debounce(() => {
-      console.log('📱 Orientamento cambiato');
-      
-      // Forza ridisegno mappa
-      setTimeout(() => {
-        map.resize();
-        updateDirectionIndicator();
-      }, 200);
-    }, 300));
-
-    if ('getBattery' in navigator) {
-      navigator.getBattery().then((battery) => {
-        console.log(`🔋 Batteria: ${(battery.level * 100).toFixed(0)}%`);
-        
-        // Modalità risparmio energetico se batteria bassa
-        function checkBattery() {
-          if (battery.level < 0.2 && !battery.charging) {
-            console.warn('⚠️ Batteria bassa - riduco aggiornamenti');
-            
-            // Riduce qualità se batteria < 20%
-            if (use3DAvatar && avatarModel) {
-              // Potresti ridurre qualità rendering qui
-              setStatus('Batteria bassa - modalità risparmio', true, 3000);
-            }
-          }
-        }
-        
-        battery.addEventListener('levelchange', checkBattery);
-        battery.addEventListener('chargingchange', checkBattery);
-        
-        checkBattery();
-      }).catch(err => {
-        console.log('Battery API non disponibile:', err);
-      });
     }
-    console.group('📊 Statistiche App');
-    console.log('Device:', /Mobile|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'Mobile' : 'Desktop');
-    console.log('Platform:', navigator.platform);
-    console.log('Screen:', `${window.screen.width}x${window.screen.height}`);
-    console.log('Viewport:', `${window.innerWidth}x${window.innerHeight}`);
-    console.log('DPR:', window.devicePixelRatio);
-    console.log('Touch:', 'ontouchstart' in window ? 'Si' : 'No');
-    console.log('WebGL:', document.createElement('canvas').getContext('webgl') ? 'Supportato' : 'Non supportato');
-    console.log('Memoria:', performance.memory ? `${(performance.memory.jsHeapSizeLimit / 1048576).toFixed(0)} MB` : 'N/A');
+
+    function toggleAvatarVisibility() {
+      avatarVisible = !avatarVisible;
+      const btn = document.getElementById('visibilityToggle');
+      
+      if (avatarVisible) {
+        btn.textContent = '👁️ Avatar ON';
+        btn.classList.remove('hidden');
+        if (avatarMarker) {
+          avatarMarker.getElement().classList.remove('avatar-hidden');
+        }
+        setStatusMap('Avatar visibile');
+      } else {
+        btn.textContent = '🚫 Avatar OFF';
+        btn.classList.add('hidden');
+        if (avatarMarker) {
+          avatarMarker.getElement().classList.add('avatar-hidden');
+        }
+        setStatusMap('Avatar nascosto');
+      }
+    }
+
+    function toggleAvatar3D() {
+      use3DAvatar = !use3DAvatar;
+      const btn = document.getElementById('avatarToggle');
+      
+      if (use3DAvatar) {
+        btn.textContent = '👤 3D';
+        btn.style.background = '#4CAF50';
+        btn.style.color = '#fff';
+        setStatusMap('Avatar 3D attivato (demo)');
+      } else {
+        btn.textContent = '👤 2D';
+        btn.style.background = 'white';
+        btn.style.color = 'black';
+        setStatusMap('Avatar 2D attivo');
+      }
+    }
+
+    let buildingsVisible = true;
+    function toggleBuildings() {
+      buildingsVisible = !buildingsVisible;
+      const btn = document.getElementById('buildingsToggle');
+      
+      if (map.getLayer('3d-buildings')) {
+        map.setLayoutProperty('3d-buildings', 'visibility', buildingsVisible ? 'visible' : 'none');
+        btn.textContent = buildingsVisible ? '🏙️ 3D On' : '🏙️ 3D Off';
+        setStatusMap(buildingsVisible ? 'Edifici 3D visibili' : 'Edifici 3D nascosti');
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // LOG INIZIALE CON LISTA ACCOUNT E INFO STORAGE
+    // ═══════════════════════════════════════════════════════════
+    console.log('🚀 App caricata');
+    console.log('');
+    
+    // Mostra info storage
+    storageInfo();
+    console.log('');
+    
+    console.group('👥 Account Disponibili');
+    ACCOUNTS_DATABASE.forEach(account => {
+      console.log(`${account.avatar} ${account.username} / ${account.password}`);
+      console.log(`   ├─ Nome: ${account.nome}`);
+      console.log(`   ├─ Ruolo: ${account.ruolo}`);
+      console.log(`   └─ Email: ${account.email}`);
+    });
     console.groupEnd();
+    
+    console.log('');
+    console.group('🛠️ Comandi Console Disponibili');
+    console.log('showAccounts()     - Mostra tutti gli account in tabella');
+    console.log('storageInfo()      - Info su storage e spazio usato');
+    console.log('exportAccounts()   - Esporta backup JSON degli account');
+    console.log('resetAccounts()    - ⚠️ RESET a account default');
+    console.log('createAccount(u,p) - Crea nuovo account da console');
+    console.groupEnd();
+    
+    console.log('');
+    console.log('💡 Credenziali: user / user123');
+    detectDevice();
   </script>
+
 </body>
 </html>
